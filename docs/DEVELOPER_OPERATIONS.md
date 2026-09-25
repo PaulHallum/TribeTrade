@@ -421,9 +421,13 @@ The following secrets **must exist** in Secret Manager under project `tribetrade
 
 | Secret Name | Used By |
 |-------------|---------|
+| `VITE_GOOGLE_MAPS_API_KEY` | Docker build arg + Cloud Run runtime |
 | `VITE_GOOGLE_CLIENT_ID` | Docker build arg + Cloud Run runtime |
 | `GOOGLE_CLIENT_SECRET` | Cloud Run runtime only |
 | `VITE_FIREBASE_VAPID_KEY` | Docker build arg only |
+
+> [!NOTE]
+> `server.ts` initialises Stripe defensively. If `STRIPE_SECRET_KEY` is not provided in Cloud Run, the backend boots cleanly and returns HTTP 503 on billing endpoints without failing startup health probes.
 
 Additional secrets not referenced in `cloudbuild.yaml` but required at Cloud Run runtime should be set as environment variables on the Cloud Run service directly via the GCP Console or CLI:
 

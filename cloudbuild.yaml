@@ -7,10 +7,10 @@ steps:
       - |
         docker build \
           -t gcr.io/tribetrader/tribe:latest \
-          --build-arg VITE_GOOGLE_MAPS_API_KEY=$$VITE_GOOGLE_MAPS_API_KEY \
-          --build-arg VITE_GOOGLE_CLIENT_ID=$$VITE_GOOGLE_CLIENT_ID \
-          --build-arg VITE_API_URL=https://tribefamilyhub.uk \
-          --build-arg VITE_FIREBASE_VAPID_KEY=$$VITE_FIREBASE_VAPID_KEY \
+          --build-arg VITE_GOOGLE_MAPS_API_KEY="$$VITE_GOOGLE_MAPS_API_KEY" \
+          --build-arg VITE_GOOGLE_CLIENT_ID="$$VITE_GOOGLE_CLIENT_ID" \
+          --build-arg VITE_API_URL="https://tribefamilyhub.uk" \
+          --build-arg VITE_FIREBASE_VAPID_KEY="$$VITE_FIREBASE_VAPID_KEY" \
           .
     secretEnv:
       - 'VITE_GOOGLE_MAPS_API_KEY'

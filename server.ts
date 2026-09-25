@@ -11,7 +11,7 @@ import fs from "fs";
 import Stripe from "stripe";
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY || "";
-const stripe = new Stripe(stripeSecretKey);
+const stripe: Stripe | null = stripeSecretKey ? new Stripe(stripeSecretKey) : null;
 
 // Modern Modular Imports
 import { initializeApp, getApps, applicationDefault } from "firebase-admin/app";
@@ -2181,6 +2181,9 @@ app.post("/api/billing/checkout", async (req, res) => {
 
     // If Price ID is configured, create a native Stripe Checkout Session
     if (priceId) {
+      if (!stripe) {
+        return res.status(503).json({ error: "Stripe billing is not configured on this server." });
+      }
       const redirectUrl = (req.headers.origin && typeof req.headers.origin === "string")
         ? req.headers.origin
         : (process.env.APP_URL || APP_URL);
@@ -2225,6 +2228,9 @@ app.post("/api/billing/portal", async (req, res) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return res.status(401).json({ error: "Unauthorized: Missing or invalid token" });
+  }
+  if (!stripe) {
+    return res.status(503).json({ error: "Stripe billing is not configured on this server." });
   }
   const token = authHeader.split(" ")[1];
   try {
@@ -2301,6 +2307,9 @@ app.post("/api/billing/sync-subscription", async (req, res) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return res.status(401).json({ error: "Unauthorized: Missing or invalid token" });
+  }
+  if (!stripe) {
+    return res.status(503).json({ error: "Stripe billing is not configured on this server." });
   }
   const token = authHeader.split(" ")[1];
   try {
@@ -2456,6 +2465,9 @@ app.post("/api/billing/cancel-subscription", async (req, res) => {
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return res.status(401).json({ error: "Unauthorized: Missing or invalid token" });
   }
+  if (!stripe) {
+    return res.status(503).json({ error: "Stripe billing is not configured on this server." });
+  }
   const token = authHeader.split(" ")[1];
   try {
     const decodedToken = await auth.verifyIdToken(token);
@@ -2513,6 +2525,9 @@ app.post("/api/billing/resume-subscription", async (req, res) => {
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return res.status(401).json({ error: "Unauthorized: Missing or invalid token" });
   }
+  if (!stripe) {
+    return res.status(503).json({ error: "Stripe billing is not configured on this server." });
+  }
   const token = authHeader.split(" ")[1];
   try {
     const decodedToken = await auth.verifyIdToken(token);
@@ -2566,6 +2581,9 @@ app.post("/api/billing/resume-subscription", async (req, res) => {
  * Validates Stripe signature, then processes subscription lifecycle events.
  */
 app.post("/api/billing/webhook", async (req, res) => {
+  if (!stripe) {
+    return res.status(503).json({ error: "Stripe billing is not configured on this server." });
+  }
   const sig = req.headers["stripe-signature"] as string;
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || "";
 
