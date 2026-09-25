@@ -420,7 +420,7 @@ The Firebase client SDK configuration is stored in [firebase-applet-config.json]
 
 ### 3.5 Google Cloud Secret Manager (Production)
 
-The following secrets **must exist** in Secret Manager under project `notegeniusfamily` for Cloud Build to succeed:
+The following secrets **must exist** in Secret Manager under project `tribetrader` for Cloud Build to succeed:
 
 | Secret Name | Used By |
 |-------------|---------|
