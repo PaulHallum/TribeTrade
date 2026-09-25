@@ -238,7 +238,7 @@ app.post("/api/nearby-discover", async (req: express.Request, res: express.Respo
 });
 
 const PORT = process.env.PORT || 8080;
-const APP_URL = process.env.APP_URL || (process.env.NODE_ENV === 'production' ? 'https://tribefamilyhub.uk' : `http://localhost:${PORT}`);
+const APP_URL = process.env.APP_URL || (process.env.NODE_ENV === 'production' ? 'https://tribetrader.web.app' : `http://localhost:${PORT}`);
 
 // Use Vertex AI backend with Application Default Credentials (ADC).
 let ai: GoogleGenAI | null = null;
@@ -1316,7 +1316,7 @@ app.get("/auth/callback", async (req, res) => {
     }
 
     if (!targetOrigin || (process.env.NODE_ENV === 'production' && targetOrigin.includes('localhost'))) {
-      targetOrigin = 'https://tribefamilyhub.uk';
+      targetOrigin = 'https://tribetrader.web.app';
     }
 
     res.send(`<html><body><script>

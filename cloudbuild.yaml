@@ -9,7 +9,7 @@ steps:
           -t gcr.io/tribetrader/tribe:latest \
           --build-arg VITE_GOOGLE_MAPS_API_KEY="$$VITE_GOOGLE_MAPS_API_KEY" \
           --build-arg VITE_GOOGLE_CLIENT_ID="$$VITE_GOOGLE_CLIENT_ID" \
-          --build-arg VITE_API_URL="https://tribefamilyhub.uk" \
+          --build-arg VITE_API_URL="https://tribetrader.web.app" \
           --build-arg VITE_FIREBASE_VAPID_KEY="$$VITE_FIREBASE_VAPID_KEY" \
           .
     secretEnv:
@@ -34,7 +34,7 @@ steps:
           --region=europe-west2 \
           --platform=managed \
           --allow-unauthenticated \
-          --set-env-vars "APP_URL=https://tribefamilyhub.uk,GOOGLE_CLIENT_ID=$$VITE_GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET=$$GOOGLE_CLIENT_SECRET,VITE_GOOGLE_MAPS_API_KEY=$$VITE_GOOGLE_MAPS_API_KEY"
+          --set-env-vars "APP_URL=https://tribetrader.web.app,GOOGLE_CLIENT_ID=$$VITE_GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET=$$GOOGLE_CLIENT_SECRET,VITE_GOOGLE_MAPS_API_KEY=$$VITE_GOOGLE_MAPS_API_KEY"
     secretEnv:
       - 'VITE_GOOGLE_CLIENT_ID'
       - 'GOOGLE_CLIENT_SECRET'

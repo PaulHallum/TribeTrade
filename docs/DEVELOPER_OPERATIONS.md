@@ -182,7 +182,7 @@ Vite environment variables are injected as Docker build arguments:
 ```
 --build-arg VITE_GOOGLE_MAPS_API_KEY=...
 --build-arg VITE_GOOGLE_CLIENT_ID=...
---build-arg VITE_API_URL=https://tribefamilyhub.uk
+--build-arg VITE_API_URL=https://tribetrader.web.app
 --build-arg VITE_FIREBASE_VAPID_KEY=...
 ```
 
@@ -205,7 +205,7 @@ gcr.io/tribetrader/tribe:latest
 
 Runtime environment variables are set during deployment:
 ```
-APP_URL=https://tribefamilyhub.uk
+APP_URL=https://tribetrader.web.app
 GOOGLE_CLIENT_ID=<from Secret Manager>
 GOOGLE_CLIENT_SECRET=<from Secret Manager>
 VITE_GOOGLE_MAPS_API_KEY=<from Secret Manager>
@@ -243,10 +243,10 @@ Firebase Hosting serves the static Vite build output and routes API requests to 
 
 | Setting | Value |
 |---------|-------|
-| Firebase project | `notegeniusfamily` |
-| Hosting target | `tribe` → site `tribefamilyhub` |
+| Firebase project | `tribetrader` |
+| Hosting target | `tribe` → site `tribetrader` |
 | Public directory | `dist` |
-| Production URL | `https://tribefamilyhub.uk` (primary), `https://tribefamilyhub.web.app` |
+| Production URL | `https://tribetrader.web.app` (primary), `https://tribetrader.firebaseapp.com` |
 
 #### Rewrite Rules
 
@@ -384,10 +384,10 @@ These are **never exposed to the browser**. They are read by `server.ts` via `pr
 | `FIREBASE_VAPID_PRIVATE_KEY` | FCM | Server-side VAPID key (private half) | `.env` (local) |
 | `INTERNAL_SHARED_SECRET` | Internal auth | Shared secret for internal API auth middleware | `.env` (local), Cloud Run env (prod) |
 | `OAUTH_ENCRYPTION_KEY` | Token vault | AES-256-GCM encryption key for OAuth tokens in Firestore (falls back to `ENCRYPTION_KEY`, then `INTERNAL_SHARED_SECRET`, then a hardcoded default) | `.env` (local), Cloud Run env (prod) |
-| `APP_URL` | Server | Base URL for OAuth callbacks and deep links. Defaults to `https://tribefamilyhub.uk` in production or `http://localhost:{PORT}` locally | `.env` (local), Cloud Run env (prod) |
+| `APP_URL` | Server | Base URL for OAuth callbacks and deep links. Defaults to `https://tribetrader.web.app` in production or `http://localhost:{PORT}` locally | `.env` (local), Cloud Run env (prod) |
 | `PORT` | Server | Express listen port. Default: `8080`. Local dev: `3001` | `.env` (local), Cloud Run default (prod) |
 | `NODE_ENV` | Server | `development` or `production` | `.env` (local), Dockerfile `ENV` (prod) |
-| `GOOGLE_CLOUD_PROJECT` | Vertex AI | GCP project ID for Vertex AI. Default: `notegeniusfamily` | ADC (local), Cloud Run metadata (prod) |
+| `GOOGLE_CLOUD_PROJECT` | Vertex AI | GCP project ID for Vertex AI. Default: `tribetrader` | ADC (local), Cloud Run metadata (prod) |
 
 ### 3.3 Frontend Variables (Vite `VITE_*` Prefix)
 
