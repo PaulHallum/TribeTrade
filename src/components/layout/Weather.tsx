@@ -28,18 +28,27 @@ export default function Weather() {
         const { latitude, longitude } = position.coords;
 
         // Get location name via reverse geocoding (Open-Meteo or similar)
-        const geoResponse = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`
-        );
-        const geoData = await geoResponse.json();
-        const locationName = geoData.address.city || geoData.address.town || geoData.address.village || 'Current Location';
+        let locationName = 'Current Location';
+        try {
+          const geoResponse = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`
+          );
+          const geoData = await geoResponse.json();
+          locationName = geoData?.address?.city || geoData?.address?.town || geoData?.address?.village || 'Current Location';
+        } catch {
+          // Gracefully fallback to default
+        }
 
         const response = await fetch(
           `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`
         );
         const data = await response.json();
 
-        const code = data.current_weather.weathercode;
+        const code = data?.current_weather?.weathercode;
+        if (code === undefined) {
+          return;
+        }
+
         let icon = Sun;
         let condition = 'Clear';
         let colorClass = 'text-amber-500';
@@ -54,7 +63,7 @@ export default function Weather() {
         else if (code >= 95) { icon = CloudRain; condition = 'Thunderstorm'; colorClass = 'text-purple-500'; }
 
         setWeather({
-          temp: Math.round(data.current_weather.temperature),
+          temp: Math.round(data?.current_weather?.temperature ?? 0),
           condition,
           icon,
           location: locationName,

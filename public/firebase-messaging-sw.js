@@ -65,9 +65,13 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
-const CACHE_NAME = 'tribe-cache-v2';
+// SW Version 1.0.7: Force immediate takeover and purge old caches
+self.addEventListener('install', (event) => {
+  self.skipWaiting();
+});
 
-// SW Version 1.0.6: Clear old caches on activate
+const CACHE_NAME = 'tribe-cache-v3';
+
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -76,7 +80,7 @@ self.addEventListener('activate', (event) => {
           .filter((name) => name !== CACHE_NAME)
           .map((name) => caches.delete(name))
       );
-    })
+    }).then(() => self.clients.claim())
   );
 });
 

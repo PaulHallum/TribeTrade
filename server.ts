@@ -3,6 +3,7 @@ dotenv.config();
 
 import express from "express";
 import rateLimit from "express-rate-limit";
+import { GoogleGenAI } from "@google/genai";
 import { OAuth2Client } from "google-auth-library";
 import { calendar as googleCalendar } from "@googleapis/calendar";
 import path from "path";
@@ -240,11 +241,16 @@ const PORT = process.env.PORT || 8080;
 const APP_URL = process.env.APP_URL || (process.env.NODE_ENV === 'production' ? 'https://tribefamilyhub.uk' : `http://localhost:${PORT}`);
 
 // Use Vertex AI backend with Application Default Credentials (ADC).
-const ai = new GoogleGenAI({
-  vertexai: true,
-  project: process.env.GOOGLE_CLOUD_PROJECT || 'tribetrader',
-  location: 'europe-west2',
-});
+let ai: GoogleGenAI | null = null;
+try {
+  ai = new GoogleGenAI({
+    vertexai: true,
+    project: process.env.GOOGLE_CLOUD_PROJECT || 'tribetrader',
+    location: 'europe-west2',
+  });
+} catch (aiErr) {
+  console.warn("[Vertex AI] Could not initialize GoogleGenAI:", aiErr);
+}
 
 const oauth2Client = new OAuth2Client(
   process.env.GOOGLE_CLIENT_ID?.trim(),
@@ -1847,6 +1853,10 @@ Always construct all summary text, safety warnings, and suggestions dynamically 
     
     Return the briefing as plain text.`;
 
+    if (!ai) {
+      throw new Error("Vertex AI is not configured on this server");
+    }
+
     const response = await ai.models.generateContent({
       model: "gemini-3.5-flash-lite",
       contents: prompt,
@@ -2074,14 +2084,18 @@ app.get("/api/admin/health", async (req, res) => {
 
   try {
     // 2. Verify Vertex AI API accessibility
-    const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash-lite",
-      contents: "healthcheck"
-    });
-    if (response && response.text) {
-      statusReport.services.vertexAi = "healthy";
+    if (!ai) {
+      statusReport.services.vertexAi = "disabled or unconfigured";
     } else {
-      throw new Error("Empty response received from Vertex AI API");
+      const response = await ai.models.generateContent({
+        model: "gemini-3.5-flash-lite",
+        contents: "healthcheck"
+      });
+      if (response && response.text) {
+        statusReport.services.vertexAi = "healthy";
+      } else {
+        throw new Error("Empty response received from Vertex AI API");
+      }
     }
   } catch (err: any) {
     statusReport.status = "unhealthy";
