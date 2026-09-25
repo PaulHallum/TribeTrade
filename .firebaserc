@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "tribetrader"
+  },
+  "targets": {
+    "tribetrader": {
+      "hosting": {
+        "tribe": [
+          "tribetrader"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

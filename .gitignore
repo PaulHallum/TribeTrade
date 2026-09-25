@@ -1,0 +1,17 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+
+# Editor / Agents
+.vscode/
+.windsurf/
+.claude/
+.continue/
+.agents/
+skills/
+skills-lock.json

@@ -1,0 +1,41 @@
+# Build artifacts
+dist
+dist-ssr
+*.local
+
+# Dependencies
+node_modules
+/functions/node_modules
+
+# Version control
+.git
+.gitignore
+
+# IDE / Editor
+.vscode
+.windsurf
+.claude
+.continue
+.agents
+
+# Firebase
+.firebase
+.firebaserc
+
+# Docker / GCloud
+Dockerfile
+.dockerignore
+.gcloudignore
+cloudbuild.yaml
+
+# Logs
+npm-debug.log
+*.log
+
+# Misc
+README.md
+COMMERCIALIZATION_GUIDE.md
+skills-lock.json
+/skills/
+/dataconnect/
+/_research/

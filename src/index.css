@@ -1,0 +1,173 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  /* Map emerald to our dynamic accent color variable */
+  --color-emerald-50: color-mix(in srgb, var(--accent-color), white 95%);
+  --color-emerald-100: color-mix(in srgb, var(--accent-color), white 90%);
+  --color-emerald-200: color-mix(in srgb, var(--accent-color), white 80%);
+  --color-emerald-300: color-mix(in srgb, var(--accent-color), white 60%);
+  --color-emerald-400: color-mix(in srgb, var(--accent-color), white 40%);
+  --color-emerald-500: var(--accent-color);
+  --color-emerald-600: color-mix(in srgb, var(--accent-color), black 10%);
+  --color-emerald-700: color-mix(in srgb, var(--accent-color), black 20%);
+  --color-emerald-800: color-mix(in srgb, var(--accent-color), black 30%);
+  --color-emerald-900: color-mix(in srgb, var(--accent-color), black 40%);
+  --color-emerald-950: color-mix(in srgb, var(--accent-color), black 60%);
+}
+
+/* Explicitly define dark variant for class-based dark mode in Tailwind v4 */
+@variant dark (&:where(.dark, .dark *));
+
+@keyframes gemini-glow {
+  0% { border-color: #10b981; box-: 0 0 10px rgba(16, 185, 129, 0.2); }
+  33% { border-color: #6366f1; box-: 0 0 15px rgba(99, 102, 241, 0.3); }
+  66% { border-color: #f43f5e; box-: 0 0 10px rgba(244, 63, 94, 0.2); }
+  100% { border-color: #10b981; box-: 0 0 10px rgba(16, 185, 129, 0.2); }
+}
+
+.animate-gemini-glow {
+  animation: gemini-glow 3s linear infinite;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+:root {
+  --accent-color: #10b981;
+  --bg-primary: #f1f3f5;
+  --bg-secondary: #ffffff;
+  --border-color: #e2e5e9;
+  --text-primary: #18181b;
+  --text-secondary: #71717a;
+}
+
+/* Mercedes Theme */
+[data-team="mercedes"] {
+  --accent-color: #00A19B; /* Petronas Teal */
+}
+
+/* Ferrari Theme */
+[data-team="ferrari"] {
+  --accent-color: #EF1A2D; /* Scuderia Red */
+}
+
+/* McLaren Theme */
+[data-team="mclaren"] {
+  --accent-color: #FF8000; /* Papaya */
+}
+
+/* Red Bull Theme */
+[data-team="redbull"] {
+  --accent-color: #FCD300; /* Oracle Yellow */
+}
+
+/* Aston Martin Theme */
+[data-team="aston"] {
+  --accent-color: #00665E; /* British Racing Green */
+  --accent-secondary: #CEDC00; /* Lime */
+}
+
+/* Williams Theme */
+[data-team="williams"] {
+  --accent-color: #005AFF; 
+}
+
+/* Haas Theme */
+[data-team="haas"] {
+  --accent-color: #F6192E;
+}
+
+/* Alpine Theme */
+[data-team="alpine"] {
+  --accent-color: #0090FF;
+}
+
+/* VCARB Theme */
+[data-team="vcarb"] {
+  --accent-color: #6692FF;
+}
+
+/* Sauber Theme -> Audi */
+[data-team="audi"] {
+  --accent-color: #A1A1A1; /* Silver */
+  --accent-secondary: #D10505; /* Audi Red */
+}
+
+/* Cadillac Theme */
+[data-team="cadillac"] {
+  --accent-color: #002147; /* Navy Blue */
+  --accent-secondary: #D4AF37; /* Cadillac Gold */
+}
+
+.dark {
+  color-scheme: dark;
+  --bg-primary: #141518;
+  --bg-secondary: #1e2025;
+  --border-color: #2b2e35;
+  --text-primary: #f4f4f5;
+  --text-secondary: #a1a1aa;
+}
+
+/* Dark Mode Overrides for Teams */
+.dark[data-team="redbull"] {
+  --bg-primary: #040030;
+  --bg-secondary: #0600EF;
+}
+
+.dark[data-team="aston"] {
+  --bg-primary: #00221E;
+  --bg-secondary: #004D44;
+}
+
+.dark[data-team="audi"] {
+  --bg-primary: #1A1A1A;
+  --bg-secondary: #2B2B2B;
+}
+
+.dark[data-team="cadillac"] {
+  --bg-primary: #001025;
+  --bg-secondary: #002147;
+}
+
+.dark[data-team="mercedes"] {
+  --bg-primary: #001211;
+  --bg-secondary: #002A29;
+}
+
+html {
+  font-size: 16px;
+}
+
+body {
+  @apply bg-[var(--bg-primary)] text-[var(--text-primary)] transition-all duration-300 antialiased;
+}
+
+.glass {
+  @apply bg-white/70 dark:bg-zinc-900/70 backdrop-blur-md border border-white/20 dark:border-zinc-800/20 ;
+}
+
+.card-hover {
+  @apply hover:translate-y-[-2px]  transition-all duration-300;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  @apply tracking-tight font-bold;
+}
+
+/* Custom scrollbar for nav */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

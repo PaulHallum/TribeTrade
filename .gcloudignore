@@ -1,0 +1,37 @@
+# .gcloudignore
+# This file specifies which files should NOT be uploaded to Google Cloud during deployment.
+# We are intentionally NOT ignoring .env here so that VITE_GEMINI_API_KEY 
+# is available during the 'npm run build' step in the Dockerfile.
+
+# Node
+node_modules/
+
+# Git
+.git/
+.gitignore
+
+# Build outputs
+build/
+dist/
+coverage/
+
+# OS/Logs
+.DS_Store
+*.log
+
+# Dev Environment & Agents
+.vscode/
+.windsurf/
+.claude/
+.continue/
+.agents/
+skills/
+skills-lock.json
+
+# Unused/Research
+_research/
+dataconnect/
+COMMERCIALIZATION_GUIDE.md
+
+# Wait, keep .env!
+

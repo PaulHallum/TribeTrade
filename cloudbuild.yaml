@@ -1,0 +1,78 @@
+steps:
+  # Build the Docker image with Vite environment variables
+  - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        docker build \
+          -t gcr.io/tribetrader/tribe:latest \
+          --build-arg VITE_GEMINI_API_KEY=$$VITE_GEMINI_API_KEY \
+          --build-arg VITE_GOOGLE_MAPS_API_KEY=$$VITE_GOOGLE_MAPS_API_KEY \
+          --build-arg VITE_GOOGLE_CLIENT_ID=$$VITE_GOOGLE_CLIENT_ID \
+          --build-arg VITE_API_URL=https://tribefamilyhub.uk \
+          --build-arg VITE_FIREBASE_VAPID_KEY=$$VITE_FIREBASE_VAPID_KEY \
+          .
+    secretEnv:
+      - 'VITE_GEMINI_API_KEY'
+      - 'VITE_GOOGLE_MAPS_API_KEY'
+      - 'VITE_GOOGLE_CLIENT_ID'
+      - 'VITE_FIREBASE_VAPID_KEY'
+
+  # Push the image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/tribetrader/tribe:latest'
+
+  # Deploy to Cloud Run
+  - name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        gcloud run deploy tribe \
+          --image=gcr.io/tribetrader/tribe:latest \
+          --region=europe-west2 \
+          --platform=managed \
+          --allow-unauthenticated \
+          --set-env-vars "APP_URL=https://tribefamilyhub.uk,GOOGLE_CLIENT_ID=$$VITE_GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET=$$GOOGLE_CLIENT_SECRET,GEMINI_API_KEY=$$VITE_GEMINI_API_KEY,VITE_GOOGLE_MAPS_API_KEY=$$VITE_GOOGLE_MAPS_API_KEY"
+    secretEnv:
+      - 'VITE_GOOGLE_CLIENT_ID'
+      - 'GOOGLE_CLIENT_SECRET'
+      - 'VITE_GEMINI_API_KEY'
+      - 'VITE_GOOGLE_MAPS_API_KEY'
+
+  # AUTOMATED CLEANUP: Keep only the latest image to save storage costs
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        REPO="us-docker.pkg.dev/tribetrader/gcr.io/tribe"
+        echo "Cleanup: Fetching image list for $$REPO..."
+        # Get all digests sorted by newest first
+        DIGESTS=$$(gcloud artifacts docker images list "$$REPO" --sort-by="~CREATE_TIME" --format="value(digest)")
+        # If there are 2 or more, skip the first (newest) and delete the others
+        echo "$$DIGESTS" | tail -n +2 | while read digest; do
+          if [ ! -z "$$digest" ]; then
+            echo "Deleting old image version: $$digest"
+            gcloud artifacts docker images delete "$$REPO@$$digest" --quiet --delete-tags
+          fi
+        done
+
+availableSecrets:
+  secretManager:
+    - versionName: projects/tribetrader/secrets/VITE_GEMINI_API_KEY/versions/latest
+      env: 'VITE_GEMINI_API_KEY'
+    - versionName: projects/tribetrader/secrets/VITE_GOOGLE_MAPS_API_KEY/versions/latest
+      env: 'VITE_GOOGLE_MAPS_API_KEY'
+    - versionName: projects/tribetrader/secrets/VITE_GOOGLE_CLIENT_ID/versions/latest
+      env: 'VITE_GOOGLE_CLIENT_ID'
+    - versionName: projects/tribetrader/secrets/GOOGLE_CLIENT_SECRET/versions/latest
+      env: 'GOOGLE_CLIENT_SECRET'
+    - versionName: projects/tribetrader/secrets/VITE_FIREBASE_VAPID_KEY/versions/latest
+      env: 'VITE_FIREBASE_VAPID_KEY'
+
+images:
+  - 'gcr.io/tribetrader/tribe:latest'

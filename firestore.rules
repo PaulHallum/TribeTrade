@@ -1,0 +1,275 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    // Collection: trade_users/{tradeUserId}/members
+    // Fields: name (string), role (string), dob (string), avatarUrl (string)
+    //
+    // Collection: trade_users/{tradeUserId}/tasks
+    // Fields: title (string), description (string), dueDate (string), status (string), authorId (string), isShared (bool)
+    //
+    // Collection: trade_users/{tradeUserId}/notes
+    // Fields: title (string), content (string), color (string), authorId (string), isShared (bool)
+    //
+    // Collection: trade_users/{tradeUserId}/taskCategories
+    // Fields: name (string), color (string), authorId (string)
+    //
+    // Collection: users/{userId}
+    // Fields: email (string), tradeUserId (string), role (string)
+    // ===============================================================
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isUserDoc(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function getTradeUserId() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('tradeUserId', '') : '';
+    }
+
+    function belongsToTradeUser(tradeUserId) {
+      return isAuthenticated() && 
+             (tradeUserId == 'trade_' + request.auth.uid ||
+              (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+               getTradeUserId() == tradeUserId));
+    }
+
+    function isGlobalAdmin() {
+      return isAuthenticated() && 
+             'email' in request.auth.token && 
+             (request.auth.token.email.lower() == 'paulhallum@gmail.com' || request.auth.token.email.lower() == 'paulhallum@googlemail.com');
+    }
+
+    function isBetaTester() {
+      return isAuthenticated() &&
+             ((exists(/databases/$(database)/documents/users/$(request.auth.uid)/private/billing) &&
+               get(/databases/$(database)/documents/users/$(request.auth.uid)/private/billing).data.get('isBetaTester', false) == true) ||
+              (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+               get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('tradeUserId', '') != '' &&
+               exists(/databases/$(database)/documents/trade_users/$(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('tradeUserId', ''))) &&
+               get(/databases/$(database)/documents/trade_users/$(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('tradeUserId', ''))).data.get('isBetaTester', false) == true));
+    }
+
+    function isTrialActive(userId) {
+      return exists(/databases/$(database)/documents/users/$(userId)/private/billing) && 
+             'trialEndsAt' in get(/databases/$(database)/documents/users/$(userId)/private/billing).data && 
+             (get(/databases/$(database)/documents/users/$(userId)/private/billing).data.trialEndsAt is timestamp ? request.time < get(/databases/$(database)/documents/users/$(userId)/private/billing).data.trialEndsAt : true);
+    }
+
+    function getSubscriptionTier(userId) {
+      return !exists(/databases/$(database)/documents/users/$(userId)) ? 'free' : (
+        (get(/databases/$(database)/documents/users/$(userId)).data.get('subscriptionTier', 'free') == 'premium' || 
+         isTrialActive(userId) ||
+         (get(/databases/$(database)/documents/users/$(userId)).data.get('tradeUserId', '') != '' && 
+          exists(/databases/$(database)/documents/trade_users/$(get(/databases/$(database)/documents/users/$(userId)).data.get('tradeUserId', ''))) && 
+          get(/databases/$(database)/documents/trade_users/$(get(/databases/$(database)/documents/users/$(userId)).data.get('tradeUserId', ''))).data.get('subscriptionTier', 'free') == 'premium')) ? 'premium' : 'free'
+      );
+    }
+
+    // Validation Functions
+    function isValidTask(data) {
+      return data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.status in ['pending', 'completed'] &&
+             (!('subtasks' in data) || data.subtasks is list);
+    }
+
+    function isValidNote(data) {
+      return data.content is string && data.content.size() > 0 && data.content.size() < 5000;
+    }
+
+    function isValidWhiteboardNote(data) {
+      return data.content is string && data.content.size() > 0 && data.content.size() <= 400;
+    }
+
+    function isValidCalendarEvent(data) {
+      return data.title is string && data.title.size() > 0 && data.title.size() < 500;
+    }
+
+    function isValidTaskCategory(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() < 100;
+    }
+
+    // Rules
+    match /users/{userId} {
+      allow read: if isUserDoc(userId) || (isAuthenticated() && resource.data.email == request.auth.token.email) || isGlobalAdmin();
+      allow create: if isUserDoc(userId) && (!('subscriptionTier' in request.resource.data) || request.resource.data.subscriptionTier == 'free');
+      allow update: if isUserDoc(userId) && 
+                     (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['subscriptionTier'])) &&
+                     (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['lastBriefingAt']) || 
+                      !('lastBriefingAt' in resource.data) || 
+                      getSubscriptionTier(request.auth.uid) == 'premium' ||
+                      request.time >= resource.data.lastBriefingAt + duration.value(3, 'h'));
+      
+      match /settings/{prefId} {
+        allow read, write: if isUserDoc(userId) || isGlobalAdmin();
+      }
+
+      match /private/{docId} {
+        allow read, write: if isUserDoc(userId) || isGlobalAdmin();
+      }
+
+    }
+
+    match /trade_users/{tradeUserId} {
+      allow read: if belongsToTradeUser(tradeUserId) || isGlobalAdmin();
+      allow create: if isAuthenticated() && (request.resource.data.get('businessName', '') is string || request.resource.data.get('familyName', '') is string || belongsToTradeUser(tradeUserId));
+      allow update: if belongsToTradeUser(tradeUserId) || isGlobalAdmin();
+      allow delete: if belongsToTradeUser(tradeUserId) || isGlobalAdmin();
+      
+      match /usage/{date} {
+        allow read: if belongsToTradeUser(tradeUserId) || isGlobalAdmin();
+        allow create: if belongsToTradeUser(tradeUserId);
+        allow update: if isGlobalAdmin() ||
+                       (belongsToTradeUser(tradeUserId) && 
+                        ((request.resource.data.get('aiUses', 0) == resource.data.get('aiUses', 0) + 1 &&
+                          (getSubscriptionTier(request.auth.uid) == 'premium' || 
+                           isBetaTester() ||
+                           request.resource.data.get('aiUses', 0) <= 5)) ||
+                         (request.resource.data.get('nearbyRuns', 0) == resource.data.get('nearbyRuns', 0) + 1 &&
+                          (getSubscriptionTier(request.auth.uid) == 'premium' || 
+                           isBetaTester() ||
+                           request.resource.data.get('nearbyRuns', 0) <= 1)) ||
+                         (request.resource.data.get('nearbyRuns', 0) == 0) ||
+                         (request.resource.data.get('smartCaptureUses', 0) == resource.data.get('smartCaptureUses', 0) + 1 &&
+                          (getSubscriptionTier(request.auth.uid) == 'premium' || 
+                           isBetaTester() ||
+                           request.resource.data.get('smartCaptureUses', 0) <= 10)) ||
+                         (request.resource.data.get('smartConvertUses', 0) == resource.data.get('smartConvertUses', 0) + 1 &&
+                          (getSubscriptionTier(request.auth.uid) == 'premium' || 
+                           isBetaTester() ||
+                           request.resource.data.get('smartConvertUses', 0) <= 10)) ||
+                         (request.resource.data.get('aiUses', 0) == resource.data.get('aiUses', 0) &&
+                          request.resource.data.get('nearbyRuns', 0) == resource.data.get('nearbyRuns', 0) &&
+                          request.resource.data.get('smartCaptureUses', 0) == resource.data.get('smartCaptureUses', 0) &&
+                          request.resource.data.get('smartConvertUses', 0) == resource.data.get('smartConvertUses', 0))));
+      }
+
+      match /members/{memberId} {
+        allow read: if belongsToTradeUser(tradeUserId) || isGlobalAdmin();
+        allow write: if belongsToTradeUser(tradeUserId) || isGlobalAdmin();
+      }
+
+      match /tasks/{taskId} {
+        allow read: if belongsToTradeUser(tradeUserId) || isGlobalAdmin();
+        allow create: if belongsToTradeUser(tradeUserId) && isValidTask(request.resource.data);
+        allow update: if belongsToTradeUser(tradeUserId) && isValidTask(request.resource.data);
+        allow delete: if belongsToTradeUser(tradeUserId) || isGlobalAdmin();
+      }
+
+      match /taskCategories/{categoryId} {
+        allow read: if belongsToTradeUser(tradeUserId) || isGlobalAdmin();
+        allow create: if belongsToTradeUser(tradeUserId) && isValidTaskCategory(request.resource.data);
+        allow update: if belongsToTradeUser(tradeUserId) && isValidTaskCategory(request.resource.data);
+        allow delete: if belongsToTradeUser(tradeUserId) || isGlobalAdmin();
+      }
+
+      match /recipes/{recipeId} {
+        allow read: if belongsToTradeUser(tradeUserId) || isGlobalAdmin();
+        allow write: if belongsToTradeUser(tradeUserId) || isGlobalAdmin();
+      }
+
+      match /notes/{noteId} {
+        allow read: if belongsToTradeUser(tradeUserId) || isGlobalAdmin();
+        allow create: if belongsToTradeUser(tradeUserId) && isValidNote(request.resource.data);
+        allow update: if belongsToTradeUser(tradeUserId) && isValidNote(request.resource.data);
+        allow delete: if belongsToTradeUser(tradeUserId) || isGlobalAdmin();
+      }
+
+      match /calendarEvents/{eventId} {
+        allow read: if belongsToTradeUser(tradeUserId) || isGlobalAdmin();
+        allow create: if belongsToTradeUser(tradeUserId) && isValidCalendarEvent(request.resource.data);
+        allow update: if belongsToTradeUser(tradeUserId) && isValidCalendarEvent(request.resource.data);
+        allow delete: if belongsToTradeUser(tradeUserId) || isGlobalAdmin();
+      }
+
+      match /mealPlans/{planId} {
+        allow read, write: if belongsToTradeUser(tradeUserId) || isGlobalAdmin();
+      }
+
+      match /meals/{mealId} {
+        allow read, write: if belongsToTradeUser(tradeUserId) || isGlobalAdmin();
+      }
+
+      match /shoppingList/{itemId} {
+        allow read, write: if belongsToTradeUser(tradeUserId) || isGlobalAdmin();
+      }
+
+      match /shedInventory/{itemId} {
+        allow read, write: if belongsToTradeUser(tradeUserId) || isGlobalAdmin();
+      }
+
+      match /quotes/{quoteId} {
+        allow read, write: if belongsToTradeUser(tradeUserId) || isGlobalAdmin();
+      }
+
+      match /invoices/{invoiceId} {
+        allow read, write: if belongsToTradeUser(tradeUserId) || isGlobalAdmin();
+      }
+
+      match /transactions/{transactionId} {
+        allow read, write: if belongsToTradeUser(tradeUserId) || isGlobalAdmin();
+      }
+
+      match /preferences/{prefId} {
+        allow read, write: if belongsToTradeUser(tradeUserId) || isGlobalAdmin();
+      }
+
+      match /memories/{memoryId} {
+        allow read, write: if belongsToTradeUser(tradeUserId) || isGlobalAdmin();
+      }
+
+      match /logs/{logId} {
+        allow read: if belongsToTradeUser(tradeUserId) || isGlobalAdmin();
+        allow create: if belongsToTradeUser(tradeUserId) || isGlobalAdmin();
+        allow update, delete: if isGlobalAdmin();
+      }
+
+      match /nearby/{docId} {
+        allow read, write: if belongsToTradeUser(tradeUserId) || isGlobalAdmin();
+      }
+
+      match /briefing/{briefingId} {
+        allow read: if belongsToTradeUser(tradeUserId) || isGlobalAdmin();
+        allow write: if (belongsToTradeUser(tradeUserId) || isGlobalAdmin()) && 
+                        (getSubscriptionTier(request.auth.uid) == 'premium' ||
+                         !exists(/databases/$(database)/documents/users/$(request.auth.uid)) ||
+                         !('lastBriefingAt' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data) ||
+                         request.time >= get(/databases/$(database)/documents/users/$(request.auth.uid)).data.lastBriefingAt + duration.value(3, 'h'));
+      }
+
+      match /connectedAccounts/{accountId} {
+        allow read, write: if belongsToTradeUser(tradeUserId) || isGlobalAdmin();
+      }
+
+      match /whiteboard/{noteId} {
+        allow read, delete: if belongsToTradeUser(tradeUserId) || isGlobalAdmin();
+        allow create, update: if (belongsToTradeUser(tradeUserId) || isGlobalAdmin()) && isValidWhiteboardNote(request.resource.data);
+      }
+    }
+
+    match /tokenUsage/{date} {
+      allow read, write: if isGlobalAdmin();
+    }
+
+    match /shared_data/{docId} {
+      allow read, write: if isAuthenticated() && (docId == request.auth.uid || resource.data.userId == request.auth.uid || request.resource.data.userId == request.auth.uid || isGlobalAdmin());
+    }
+
+    match /user_tokens/{docId} {
+      allow read, write: if isAuthenticated() && (docId == request.auth.uid || isGlobalAdmin());
+    }
+
+    match /support_tickets/{ticketId} {
+      allow create: if request.auth != null;
+      allow read: if request.auth != null && (resource.data.get('userId', '') == request.auth.uid || isGlobalAdmin());
+      allow update: if isGlobalAdmin();
+      allow delete: if request.auth != null && (resource.data.get('userId', '') == request.auth.uid || isGlobalAdmin());
+    }
+  }
+}
