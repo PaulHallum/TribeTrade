@@ -105,15 +105,14 @@ npm run preview
 
 ### 1.6 App Check (Production & Local Development)
 
-Firebase App Check uses Google reCAPTCHA Enterprise (`6LeXQs8sAAAAAJ779Yl3e7tSsPZaAuOKrF80tWm9`) in production to protect Cloud Firestore and backend APIs.
-- **Production Allowed Domains**: Because domain enforcement is enabled (`allowAllDomains: false`), any custom domain serving the application must be registered under the reCAPTCHA key in Google Cloud Console (`Security > reCAPTCHA Enterprise > NoteGenius Family`):
-  - `tribefamilyhub.uk`
-  - `tribefamilyhub.web.app`
-  - `tribefamilyhub.firebaseapp.com`
+Firebase App Check uses Google reCAPTCHA Enterprise (`6Ldyp84tAAAAABXJJ7KdQ1CfCWZ95QWwm1l-ZOxT`) in production to protect Cloud Firestore and backend APIs.
+- **Production Allowed Domains**: Because domain enforcement is enabled (`allowAllDomains: false`), any custom domain serving the application must be registered under the reCAPTCHA key in Google Cloud Console (`Security > reCAPTCHA Enterprise > tribetrader`):
+  - `tribetrader.web.app`
+  - `tribetrader.firebaseapp.com`
   - `localhost`
   If a new custom domain is missing from this list, Firestore rejects requests with `FirebaseError: Missing or insufficient permissions`. To update via CLI:
   ```bash
-  gcloud recaptcha keys update 6LeXQs8sAAAAAJ779Yl3e7tSsPZaAuOKrF80tWm9 --project=notegeniusfamily --web --domains="tribefamilyhub.uk,tribefamilyhub.web.app,tribefamilyhub.firebaseapp.com,notegenius.uk,localhost"
+  gcloud recaptcha keys update 6Ldyp84tAAAAABXJJ7KdQ1CfCWZ95QWwm1l-ZOxT --project=tribetrader --web --domains="tribetrader.web.app,tribetrader.firebaseapp.com,localhost"
   ```
 - **Local Development**: When running on `localhost` or `127.0.0.1`, [firebase.ts](file:///c:/GitHub/TribeTrade/src/lib/firebase.ts) automatically sets `FIREBASE_APPCHECK_DEBUG_TOKEN = debugToken || true`. If `VITE_APPCHECK_DEBUG_TOKEN` is not specified, Firebase App Check logs a generated debug token in the DevTools console for whitelisting in the Firebase Console under **App Check > Manage debug tokens**.
 

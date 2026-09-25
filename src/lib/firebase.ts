@@ -19,7 +19,7 @@ const app = initializeApp(firebaseConfig);
 // Initialize App Check (2026 Security Standard)
 export let isAppCheckFailed = false;
 
-const RECAPTCHA_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY || '6LeXQs8sAAAAAJ779Yl3e7tSsPZaAuOKrF80tWm9';
+const RECAPTCHA_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY || '6Ldyp84tAAAAABXJJ7KdQ1CfCWZ95QWwm1l-ZOxT';
 
 if (typeof window !== 'undefined') {
   // Allow explicit debug token via environment variable if provided, or default to true on localhost
