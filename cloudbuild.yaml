@@ -34,7 +34,7 @@ steps:
           --region=europe-west2 \
           --platform=managed \
           --allow-unauthenticated \
-          --set-env-vars "APP_URL=https://tribetrader.web.app,GOOGLE_CLIENT_ID=$$VITE_GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET=$$GOOGLE_CLIENT_SECRET,VITE_GOOGLE_MAPS_API_KEY=$$VITE_GOOGLE_MAPS_API_KEY"
+          --update-env-vars "APP_URL=https://tribetrader.web.app,GOOGLE_CLIENT_ID=$$VITE_GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET=$$GOOGLE_CLIENT_SECRET,VITE_GOOGLE_MAPS_API_KEY=$$VITE_GOOGLE_MAPS_API_KEY"
     secretEnv:
       - 'VITE_GOOGLE_CLIENT_ID'
       - 'GOOGLE_CLIENT_SECRET'
