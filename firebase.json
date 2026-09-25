@@ -47,6 +47,20 @@
     ],
     "rewrites": [
       {
+        "source": "/api/**",
+        "run": {
+          "serviceId": "tribe",
+          "region": "europe-west2"
+        }
+      },
+      {
+        "source": "/auth/**",
+        "run": {
+          "serviceId": "tribe",
+          "region": "europe-west2"
+        }
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }
