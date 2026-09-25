@@ -40,7 +40,7 @@ export async function lookupPlaceDetails(venueName: string, locationHint: string
   }
 
   try {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
     if (!apiKey) {
       return { name: venueName, mapsUrl: fallbackMapsUrl };
     }

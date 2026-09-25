@@ -10,54 +10,6 @@ export const googleAI = getAI(app, { backend: new GoogleAIBackend() });
 export const FLASH_3_5_LITE = "gemini-3.5-flash-lite";
 export const FLASH_3_1_LITE = FLASH_3_5_LITE;
 
-/**
- * Fallback to direct Gemini API when Firebase App Check token is invalid or blocked
- */
-export async function callDirectGeminiFallback(
-  contents: any[],
-  systemInstruction?: string,
-  generationConfig?: any
-): Promise<string> {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
-  if (!apiKey) {
-    throw new Error("No Gemini API key available for fallback.");
-  }
-
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${apiKey}`;
-  const body: any = { contents };
-
-  if (systemInstruction) {
-    body.systemInstruction = {
-      parts: [{ text: systemInstruction }]
-    };
-  }
-
-  if (generationConfig) {
-    body.generationConfig = {
-      responseMimeType: generationConfig.responseMimeType || "application/json",
-      temperature: generationConfig.temperature ?? 0.1
-    };
-  }
-
-  const res = await fetch(endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body)
-  });
-
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Direct Gemini fallback failed (${res.status}): ${errText}`);
-  }
-
-  const data = await res.json();
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) {
-    throw new Error("Direct Gemini fallback returned empty text.");
-  }
-  return text;
-}
-
 // ─── ZOD SCHEMAS FOR AI RESPONSES ────────────────────────────────
 
 export const NLPActionDataSchema = z.object({

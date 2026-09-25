@@ -116,7 +116,6 @@ Firebase App Check uses Google reCAPTCHA Enterprise (`6LeXQs8sAAAAAJ779Yl3e7tSsP
   gcloud recaptcha keys update 6LeXQs8sAAAAAJ779Yl3e7tSsPZaAuOKrF80tWm9 --project=notegeniusfamily --web --domains="tribefamilyhub.uk,tribefamilyhub.web.app,tribefamilyhub.firebaseapp.com,notegenius.uk,localhost"
   ```
 - **Local Development**: When running on `localhost` or `127.0.0.1`, [firebase.ts](file:///c:/GitHub/TribeTrade/src/lib/firebase.ts) automatically sets `FIREBASE_APPCHECK_DEBUG_TOKEN = debugToken || true`. If `VITE_APPCHECK_DEBUG_TOKEN` is not specified, Firebase App Check logs a generated debug token in the DevTools console for whitelisting in the Firebase Console under **App Check > Manage debug tokens**.
-- **Direct Gemini Fallback**: To ensure complete resilience in local development, on unverified domains, or when ad-blockers interfere with reCAPTCHA Enterprise, [gemini.ts](file:///c:/GitHub/TribeTrade/src/services/gemini.ts) and [aiUtils.ts](file:///c:/GitHub/TribeTrade/src/services/ai/aiUtils.ts) include an automated fallback (`callDirectGeminiFallback`). If a `401 Unauthorized` or `App Check token is invalid` error is caught, the system transparently routes the prompt through the Google Gemini Developer API using `VITE_GEMINI_API_KEY`.
 
 ### 1.7 Stripe Webhook Testing (Local)
 
@@ -181,7 +180,7 @@ The [Dockerfile](file:///c:/GitHub/Tribe/Dockerfile) uses a two-stage build:
 
 Vite environment variables are injected as Docker build arguments:
 ```
---build-arg VITE_GEMINI_API_KEY=...
+--build-arg VITE_GOOGLE_MAPS_API_KEY=...
 --build-arg VITE_GOOGLE_CLIENT_ID=...
 --build-arg VITE_API_URL=https://tribefamilyhub.uk
 --build-arg VITE_FIREBASE_VAPID_KEY=...
@@ -191,7 +190,7 @@ These build args are sourced from Google Cloud Secret Manager (see Step 3 below)
 
 **Step 2 — Push to Container Registry:**
 ```
-gcr.io/notegeniusfamily/tribe:latest
+gcr.io/tribetrader/tribe:latest
 ```
 
 **Step 3 — Deploy to Cloud Run:**
@@ -209,12 +208,12 @@ Runtime environment variables are set during deployment:
 APP_URL=https://tribefamilyhub.uk
 GOOGLE_CLIENT_ID=<from Secret Manager>
 GOOGLE_CLIENT_SECRET=<from Secret Manager>
-GEMINI_API_KEY=<from Secret Manager>
+VITE_GOOGLE_MAPS_API_KEY=<from Secret Manager>
 ```
 
 **Step 4 — Automated Image Cleanup:**
 
-After deployment, the pipeline automatically deletes all older container image versions from `us-docker.pkg.dev/notegeniusfamily/gcr.io/tribe`, keeping only the latest. This saves storage costs.
+After deployment, the pipeline automatically deletes all older container image versions from `us-docker.pkg.dev/tribetrader/gcr.io/tribe`, keeping only the latest. This saves storage costs.
 
 #### Secrets in Cloud Build
 
@@ -222,7 +221,7 @@ All secrets are fetched from **Google Cloud Secret Manager** at build time:
 
 | Secret Name | Cloud Build Env Var | Used In |
 |-------------|-------------------|---------|
-| `VITE_GEMINI_API_KEY` | `VITE_GEMINI_API_KEY` | Docker build arg + Cloud Run env |
+| `VITE_GOOGLE_MAPS_API_KEY` | `VITE_GOOGLE_MAPS_API_KEY` | Docker build arg + Cloud Run env |
 | `VITE_GOOGLE_CLIENT_ID` | `VITE_GOOGLE_CLIENT_ID` | Docker build arg + Cloud Run env |
 | `GOOGLE_CLIENT_SECRET` | `GOOGLE_CLIENT_SECRET` | Cloud Run env only |
 | `VITE_FIREBASE_VAPID_KEY` | `VITE_FIREBASE_VAPID_KEY` | Docker build arg only |
@@ -370,7 +369,6 @@ These are **never exposed to the browser**. They are read by `server.ts` via `pr
 |----------|---------|---------|-------------|
 | `GOOGLE_CLIENT_ID` | Google OAuth | OAuth2 client ID for Calendar scope | `.env` (local), Secret Manager (prod) |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth | OAuth2 client secret | `.env` (local), Secret Manager (prod) |
-| `GEMINI_API_KEY` | Google AI | Vertex AI backend calls & injected into frontend HTML at runtime | `.env` (local), Secret Manager (prod) |
 | `STRIPE_SECRET_KEY` | Stripe | Server-side Stripe API access | `.env` (local), Cloud Run env (prod) |
 | `STRIPE_WEBHOOK_SECRET` | Stripe | Webhook signature validation | `.env` (local), Cloud Run env (prod) |
 | `STRIPE_PRICE_ID_MONTHLY` | Stripe | Monthly subscription price ID | `.env` (local), Cloud Run env (prod) |
@@ -398,16 +396,15 @@ These are **baked into the JavaScript bundle at build time** by Vite. They are p
 | Variable | Purpose | Where to Set |
 |----------|---------|-------------|
 | `VITE_GOOGLE_CLIENT_ID` | OAuth popup for Google sign-in (same value as backend `GOOGLE_CLIENT_ID`) | `.env` (local), Docker build arg (prod) |
-| `VITE_GEMINI_API_KEY` | Firebase AI Logic SDK (client-side Gemini calls) | `.env` (local), Docker build arg (prod) |
 | `VITE_FIREBASE_VAPID_KEY` | FCM push notification token registration (public VAPID key) | `.env` (local), Docker build arg (prod) |
 | `VITE_API_URL` | Base URL for API calls (unused in current code — proxy handles routing) | `.env` (local), Docker build arg (prod) |
 | `VITE_RECAPTCHA_SITE_KEY` | reCAPTCHA Enterprise site key for App Check (has a hardcoded fallback in code) | `.env` (local, optional) |
 | `VITE_APPCHECK_DEBUG_TOKEN` | App Check debug token for local development (only activates on localhost) | `.env` (local only) |
-| `VITE_GOOGLE_MAPS_API_KEY` | Google Places API key (falls back to `VITE_GEMINI_API_KEY`) | `.env` (local, optional) |
+| `VITE_GOOGLE_MAPS_API_KEY` | Google Places API key | `.env` (local, optional) |
 
-### 3.4 Firebase Client Configuration (Public)
+### 3.4 Firebase Client Configuration
 
-The Firebase client SDK configuration is stored in [firebase-applet-config.json](file:///c:/GitHub/Tribe/firebase-applet-config.json) and imported directly by `src/lib/firebase.ts`. These are public values:
+The Firebase client SDK configuration is stored in [firebase-applet-config.json](file:///c:/GitHub/TribeTrade/firebase-applet-config.json) and imported directly by `src/lib/firebase.ts`. To prevent automated secret scanner alerts on GitHub repositories, this file is gitignored and a template is tracked in [firebase-applet-config.example.json](file:///c:/GitHub/TribeTrade/firebase-applet-config.example.json). Values required:
 
 | Key | Value |
 |-----|-------|
@@ -424,7 +421,6 @@ The following secrets **must exist** in Secret Manager under project `tribetrade
 
 | Secret Name | Used By |
 |-------------|---------|
-| `VITE_GEMINI_API_KEY` | Docker build arg + Cloud Run runtime |
 | `VITE_GOOGLE_CLIENT_ID` | Docker build arg + Cloud Run runtime |
 | `GOOGLE_CLIENT_SECRET` | Cloud Run runtime only |
 | `VITE_FIREBASE_VAPID_KEY` | Docker build arg only |
@@ -437,18 +433,7 @@ gcloud run services update tribe \
   --set-env-vars "STRIPE_SECRET_KEY=sk_live_...,STRIPE_WEBHOOK_SECRET=whsec_...,MICROSOFT_CLIENT_ID=...,MICROSOFT_CLIENT_SECRET=...,YAHOO_CLIENT_ID=...,YAHOO_CLIENT_SECRET=..."
 ```
 
-### 3.6 Runtime Environment Injection
-
-In production, the Express server's catch-all `GET *` handler injects the `GEMINI_API_KEY` into the served HTML at runtime. This is done in [server.ts](file:///c:/GitHub/Tribe/server.ts#L1720-L1727):
-
-```typescript
-const envScript = `<script>window.ENV = { GEMINI_API_KEY: "${process.env.GEMINI_API_KEY || ''}" };</script>`;
-html = html.replace('</head>', `${envScript}</head>`);
-```
-
-This allows the frontend to access the Gemini API key without baking it into the static Vite build, enabling secret rotation without rebuilding the frontend.
-
-### 3.7 Complete `.env` Template
+### 3.6 Complete `.env` Template
 
 Copy `.env.example` and fill in all values:
 
@@ -465,11 +450,8 @@ MICROSOFT_CLIENT_ID="your-microsoft-client-id"
 MICROSOFT_CLIENT_SECRET="your-microsoft-client-secret"
 MICROSOFT_TENANT_ID="common"
 
-GEMINI_API_KEY="your-gemini-api-key"
-
 # ─── FRONTEND PUBLIC (baked into JS by Vite) ────────────────────────
 VITE_GOOGLE_CLIENT_ID="your-google-oauth-client-id"
-VITE_GEMINI_API_KEY="your-gemini-api-key"
 VITE_FIREBASE_VAPID_KEY="your-firebase-vapid-public-key"
 VITE_API_URL="http://localhost:3001"
 

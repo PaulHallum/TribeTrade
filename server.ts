@@ -3,7 +3,6 @@ dotenv.config();
 
 import express from "express";
 import rateLimit from "express-rate-limit";
-import { GoogleGenAI } from "@google/genai";
 import { OAuth2Client } from "google-auth-library";
 import { calendar as googleCalendar } from "@googleapis/calendar";
 import path from "path";
@@ -72,7 +71,7 @@ app.post("/api/nearby-specific", async (req: express.Request, res: express.Respo
       return res.status(400).json({ error: "Missing required parameters: searchQuery, lat, and lng are required." });
     }
 
-    const apiKey = process.env.GOOGLE_PLACES_API_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY || process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+    const apiKey = process.env.GOOGLE_PLACES_API_KEY || process.env.GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY;
 
     if (!apiKey) {
       console.error("[Nearby Specific] Missing Google Places API Key");
@@ -141,7 +140,7 @@ app.post("/api/nearby-discover", async (req: express.Request, res: express.Respo
       return res.status(400).json({ error: "Missing required parameters: lat and lng are required." });
     }
 
-    const apiKey = process.env.GOOGLE_PLACES_API_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY || process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+    const apiKey = process.env.GOOGLE_PLACES_API_KEY || process.env.GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY;
 
     if (!apiKey) {
       console.error("[Nearby Discover] Missing Google Places API Key");
@@ -1367,7 +1366,7 @@ function getOffsetCoordinate(lat: number, lng: number, offsetMiles: number, angl
 
 app.get("/api/places/search", async (req, res) => {
   const { query, location, radius } = req.query;
-  const apiKey = process.env.VITE_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY || process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+  const apiKey = process.env.GOOGLE_PLACES_API_KEY || process.env.GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY;
   if (!apiKey) {
     return res.status(500).json({ error: "No API key configured for Google Maps." });
   }
@@ -2696,11 +2695,8 @@ app.get("/firebase-messaging-sw.js", (req, res) => {
 app.get("*", (req, res) => {
   const indexPath = path.join(distPath, "index.html");
   if (fs.existsSync(indexPath)) {
-    let html = fs.readFileSync(indexPath, 'utf-8');
-    const envScript = `<script>window.ENV = { GEMINI_API_KEY: "${process.env.GEMINI_API_KEY || ''}" };</script>`;
-    html = html.replace('</head>', `${envScript}</head>`);
     res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
-    res.send(html);
+    res.sendFile(indexPath);
   } else {
     res.status(404).send("App not built yet. Run npm run build.");
   }

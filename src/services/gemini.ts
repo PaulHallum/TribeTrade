@@ -2,7 +2,7 @@ import app, { auth } from "../lib/firebase";
 import { logger } from "./logger";
 import { incrementAiUsage } from "./usageService";
 import { getGenerativeModel } from "firebase/ai";
-import { withSilentRetry, safeParseJSON, parseAndValidateJSON, NLPResponseSchema, PantryAnalysisSchema, googleAI, FLASH_3_1_LITE, callDirectGeminiFallback } from "./ai/aiUtils";
+import { withSilentRetry, safeParseJSON, parseAndValidateJSON, NLPResponseSchema, PantryAnalysisSchema, googleAI, FLASH_3_1_LITE } from "./ai/aiUtils";
 
 
 async function assertLimitAndIncrement() {
@@ -51,13 +51,8 @@ RULES:
       const result = await model.generateContent(prompt);
       briefingText = result.response.text();
     } catch (err: any) {
-      const errMsg = err?.message || String(err || "");
-      if (errMsg.includes("App Check") || errMsg.includes("401") || err?.code === "fetch-error") {
-        logger.warn("App Check failed on daily briefing, falling back to direct Gemini API", err);
-        briefingText = await callDirectGeminiFallback([{ role: 'user', parts: [{ text: prompt }] }], undefined, { temperature: 0.8 });
-      } else {
-        throw err;
-      }
+      logger.error("Daily briefing generation failed:", err);
+      throw err;
     }
     
     if (!briefingText) {
@@ -167,21 +162,8 @@ Return JSON:
 
       rawResponseText = response.text();
     } catch (err: any) {
-      const errMsg = err?.message || String(err || "");
-      if (
-        errMsg.includes("App Check") ||
-        errMsg.includes("401") ||
-        err?.code === "fetch-error" ||
-        err?.status === 401
-      ) {
-        logger.warn("Firebase App Check failed or unauthorized, falling back to direct Gemini API", err);
-        rawResponseText = await callDirectGeminiFallback(contents, systemInstruction, {
-          responseMimeType: "application/json",
-          temperature: 0.1
-        });
-      } else {
-        throw err;
-      }
+      logger.error("AI command generation failed:", err);
+      throw err;
     }
 
     if (!rawResponseText) {

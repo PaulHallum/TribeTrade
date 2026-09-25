@@ -6,6 +6,8 @@ coverage/
 *.log
 .env*
 !.env.example
+firebase-applet-config.json
+!firebase-applet-config.example.json
 
 # Editor / Agents
 .vscode/

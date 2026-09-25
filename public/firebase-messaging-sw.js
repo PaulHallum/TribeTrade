@@ -4,7 +4,7 @@ importScripts('https://www.gstatic.com/firebasejs/11.0.1/firebase-messaging-comp
 // These values are injected from the main config
 // In a production app, these should be securely managed
 const firebaseConfig = {
-  apiKey: ["AIzaSyCT", "TA3wb7SUINhFG20_u9hMioEUhUvxTY0"].join(""),
+  apiKey: ["AIzaSyDh", "3TozIIs9xAw660BpFyku2SZtUFkNb6A"].join(""),
   authDomain: "tribetrader.firebaseapp.com",
   projectId: "tribetrader",
   storageBucket: "tribetrader.firebasestorage.app",

@@ -1,0 +1,10 @@
+{
+  "projectId": "tribetrader",
+  "appId": "1:224274649446:web:a1a05a9a5b9a26808938a7",
+  "apiKey": "YOUR_FIREBASE_WEB_API_KEY",
+  "authDomain": "tribetrader.firebaseapp.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "tribetrader.firebasestorage.app",
+  "messagingSenderId": "224274649446",
+  "measurementId": "G-BP0LL6ZZXV"
+}

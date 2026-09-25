@@ -438,10 +438,8 @@ service firebase.storage {
 ### 7.1 Receipt OCR Service (`src/services/geminiReceiptService.ts`)
 Uses Gemini 3.5 Flash Multimodal vision to extract financial and merchant details from a snapped receipt photo:
 
-```typescript
-import { GoogleGenAI } from "@google/genai";
-
-const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+import { getGenerativeModel } from "firebase/ai";
+import { googleAI, FLASH_3_5_LITE } from "./ai/aiUtils";
 
 export interface ParsedReceipt {
   vendor: string;
@@ -490,10 +488,8 @@ Strict Rules:
 ### 7.2 Quote Scope Enhancer (`src/services/geminiQuoteService.ts`)
 Takes rough job notes and produces professional, client-facing specifications:
 
-```typescript
-import { GoogleGenAI } from "@google/genai";
-
-const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+import { getGenerativeModel } from "firebase/ai";
+import { googleAI, FLASH_3_5_LITE } from "./ai/aiUtils";
 
 export async function polishJobScopeWithGemini(rawNotes: string, tradeType: string = "Painter & Decorator"): Promise<string> {
   const prompt = `You are an expert UK ${tradeType}. Transform the following shorthand job notes into a clear, professional, client-facing scope of work for a formal quotation:
