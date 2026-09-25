@@ -903,7 +903,7 @@ export default function SettingsView({
       />
 
       {/* Category Sub-Menu Filter Pills for Mobile & Desktop */}
-      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-2 mt-4 -mx-1 px-1">
+      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 py-2 mt-4">
         {[
           { id: 'billing', label: 'Account & Subscription', icon: '💳' },
           { id: 'business', label: 'Business & Rates', icon: '🏢' },
@@ -926,10 +926,10 @@ export default function SettingsView({
                   ...(cat.id === 'app' ? { audio: true, appearance: true } : {})
                 }));
               }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all border active:scale-95 ${
                 isActive
-                  ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-500/20'
-                  : 'bg-zinc-100 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'
+                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm shadow-emerald-500/20'
+                  : 'bg-white dark:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700/80 hover:bg-zinc-50 dark:hover:bg-zinc-700/60'
               }`}
             >
               <span>{cat.icon}</span>
