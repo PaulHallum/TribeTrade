@@ -738,4 +738,9 @@ Before marking the spin-off build complete, Antigravity must verify:
 - [ ] **Quote AI Scope:** Shorthand job notes polish into professional client descriptions via Gemini 3.5 Flash.
 - [ ] **Clean A4 PDF Export:** Printing an invoice displays clean black-on-white formatting with BACS bank details, hiding all mobile navigation.
 - [ ] **HMRC CSV Export:** Generates standard UK tax year CSV file with correct SA103 boxes (Box 9, Box 11, Box 12, Box 14, Box 15, Box 16).
+- [ ] **Van Mileage Log:** Generates HMRC-compliant 45p/mi vehicle mileage spreadsheet and logs journeys against specific jobs and quotes.
+- [ ] **Quote-to-Invoice Lifecycle & Revert:** Quotes can be marked sent, converted to invoices, hidden from active quotes, and reverted back safely if needed.
+- [ ] **Invoice Accounting Export:** Invoices summary CSV download formatted for Xero and accountant reconciliation.
+- [ ] **Statutory Financial Disclaimer:** Explicit statement across all financial tools clarifying TribeTrade is an AI assistant, not an accountant.
+- [ ] **Trade Scribbles OCR:** AI parsing of paper notes into Quotes, The Shed shopping lists, Calendar appointments, or Tasks.
 - [ ] **British English Compliance:** All labels, prompts, and sample data strictly use British English ("MOT", "Van", "BACS", "Sort Code", "Skirting", "Emulsion").

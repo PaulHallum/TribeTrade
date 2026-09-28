@@ -55,3 +55,26 @@ export function createDefaultComplianceItems(): VehicleComplianceItem[] {
     }
   ];
 }
+
+export const HMRC_STANDARD_MILEAGE_RATE = 0.45; // 45p per mile for first 10,000 miles (HMRC simplified expenses)
+
+export interface MileageEntry {
+  id: string;
+  vehicleId?: string;
+  vehicleReg?: string;
+  vehicleName?: string;
+  date: string; // YYYY-MM-DD
+  startOdometer?: number;
+  endOdometer?: number;
+  miles: number;
+  purpose: string; // e.g. "Site survey", "Collection from Screwfix", "Emergency callout"
+  startLocation?: string;
+  destination?: string;
+  jobId?: string;
+  jobTitle?: string;
+  ratePerMile: number; // HMRC rate default 0.45
+  totalClaim: number; // miles * ratePerMile
+  notes?: string;
+  createdAt?: string;
+  authorId?: string;
+}

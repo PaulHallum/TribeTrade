@@ -41,8 +41,7 @@ RULES:
     const model = getGenerativeModel(googleAI, { 
       model: FLASH_3_1_LITE,
       generationConfig: { 
-        temperature: 0.8, // Warm & friendly briefing
-        thinkingConfig: { thinkingBudget: 1024 }
+        temperature: 0.8 // Warm & friendly briefing
       }
     });
     
@@ -335,8 +334,7 @@ Return ONLY JSON:
             generationConfig: { 
                 responseMimeType: "application/json",
                 temperature: 0.2,
-                maxOutputTokens: 4096,
-                thinkingConfig: { thinkingBudget: 1024 }
+                maxOutputTokens: 4096
             }
         });
 
@@ -410,8 +408,7 @@ Example:
       model: FLASH_3_1_LITE,
       generationConfig: { 
         responseMimeType: "application/json",
-        temperature: 0.2,
-        thinkingConfig: { thinkingBudget: 1024 }
+        temperature: 0.2
       }
     });
     

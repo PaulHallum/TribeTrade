@@ -782,6 +782,17 @@ export default function AIInput() {
         {showQuickAdd && (
           <QuickAddModal 
             onClose={() => setShowQuickAdd(false)} 
+            initialDate={(() => {
+              try {
+                const isCalendarView = window.history.state?.view === 'calendar';
+                const stored = sessionStorage.getItem('tribe_selected_calendar_date');
+                if (isCalendarView && stored) {
+                  const d = new Date(stored);
+                  if (!isNaN(d.getTime())) return d;
+                }
+              } catch (e) {}
+              return undefined;
+            })()}
             initialType={
               (window.history.state?.view === 'notes' || window.history.state?.tab === 'notes') ? 'note' :
               window.history.state?.view === 'tasks' ? 'task' :

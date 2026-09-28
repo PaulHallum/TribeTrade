@@ -21,6 +21,11 @@ Here is how to invite an apprentice or subbie to your Trade Hub:
 
 *Tip: Tap **Share Crew Link** to send the invitation directly via WhatsApp or SMS.*
 
+### Quick Navigation: The TribeTrade Home Pill & Shimmer Menu Button
+TribeTrade provides swift, tactile navigation from any screen:
+- **TribeTrade Home Pill:** Located in the top-left corner, the high-contrast branded pill embeds the company logo on a clean white surface with your trade accent colour, providing 1-tap navigation directly back to your Trade Hub from any screen.
+- **Shimmer Menu Button:** Located in the top-right corner, an eye-catching themed button with a dynamic light-beam shimmer opens the full **Navigation Drawer** with 1-tap access to your Hub, Calendar, Quotes & Invoices, Expenses, Tasks, The Shed Supplies, Email, Settings, and User Guide.
+
 ---
 
 ## 2. The AI Sandbox: A Safe Place to Test
@@ -111,6 +116,8 @@ Under the **Supplies** tab, TribeTrade provides two key tools for materials mana
 - **Log Held Inventory:** Record materials, tools, and consumables currently stored in your company shed, lock-up, or vans.
 - **Fractional Stock Tracking:** Enter whole or decimal quantities (e.g. `0.5` pots of paint, `2.5` litres of solvent, or whole counts).
 - **Quick Quantity Controls:** Tap `+` and `-` to increment or decrement stock holdings in real time (with 0.5 steps for low/fractional items), or tap the quantity directly to edit it.
+- **Job Allocations & Reserved Stock:** Allocate and reserve materials directly against an active Trade Invoice or custom job. Stock cards clearly show a `[x] reserved` badge so you know which supplies are already committed.
+- **Reserved Stock by Job:** A dedicated live panel at the bottom of The Shed groups all reserved stock by customer job / invoice with quantities, values, and 1-tap unreserve actions.
 - **Out-of-Stock Alerts:** Automatically flags depleted items so your team never gets caught short.
 - **Order More:** One-tap "Order More" copies an item from The Shed straight into your **Materials Pick List** for prompt reordering.
 
@@ -152,7 +159,9 @@ When a customer accepts a quotation (or when you mark it as **Accepted**), Tribe
 ### Trade Invoices & Payment Tracking
 - Toggle to the **Invoices** view from the top of the Quotes page.
 - Track **Total Invoiced**, **Paid Invoices**, and **Outstanding Balance** in real-time.
-- Update payment statuses (`Draft`, `Sent`, `Paid`, `Overdue`).
+- Update payment statuses (`Draft`, `Sent`, `Paid`, `Completed`, `Overdue`).
+- **Completed & Paid Automatic Turnover Sync:** Marking an invoice as **Completed** or **Paid** automatically logs an income record in your Trade Expenses ledger under HMRC Box 10 (Turnover), including net, VAT, and gross breakdown, keeping your Self-Assessment tax pot up to date.
+- **Effortless Modal Exit:** Invoice and quote modals support instant dismissal via backdrop tap, the Escape key, or dedicated Close buttons.
 - Generate, download, and share professional A4 Invoice PDFs with BACS transfer details, payment terms, and HMRC VAT compliance.
 
 ### Native Mobile PDF Sharing
@@ -169,7 +178,7 @@ The **Hub** dashboard features a dedicated **Quotes & Estimates** panel right al
 ### Quick Add (`+` Button)
 The floating `+` button in the navigation bar provides rapid entry across the entire business:
 - **Job / Event:** Schedule client appointments and site visits with start and end times, and locations.
-- **Quote:** Quickly create a new quote draft by entering the client name, job title, and estimated price (£).
+- **Quote (⚡ Quick Quote):** Rapidly create a new quote draft. Tapping **+ Add Quote** flags it as a Quick Quote and immediately takes you to the full quote prompt editor to detail labour, materials, and pricing on the spot.
 - **Expense:** Record merchant purchases with gross amount, date, payment method, and HMRC SA103 tax categories.
 - **Task:** Create pending tasks with due dates, categories, and subtask checklists.
 - **Materials:** Add trade consumables, plumbing supplies, paint, or tools directly to the central Pick List.
@@ -203,8 +212,8 @@ Located immediately next to **Quotes** in the navigation bar, the **Expenses** t
    - Input the gross amount and VAT rate; Net and VAT amounts calculate automatically.
 
 ### HMRC Making Tax Digital (MTD) CSV Export
-- Tap **Export MTD CSV** at the top right of the Expenses ledger.
-- Filter by **Current Tax Year (6 April - 5 April)**, **Previous Tax Year**, or **Quarterly Periods**.
+- Located directly below the transaction entry ledger (and above the statutory compliance notices), tap **Export MTD CSV**.
+- Filter by **Current Tax Year (6 April - 5 April)**, **Previous Tax Year**, or **Quarterly Periods** using the tax period selector.
 - Tribe generates an accountant-ready CSV complete with HMRC SA103 box classifications (Box 11, Box 12, Box 14, etc.), VAT breakdown, net profit/loss calculations, and transaction references.
 - Send the CSV directly to your bookkeeper or import it into HMRC MTD bridging software.
 
@@ -218,10 +227,25 @@ Located right next to the MTD export button, tap **Self Assessment Helper** to o
 - **Payments on Account Preview:** Outlines estimated 50% advance payments if tax liability exceeds £1,000.
 - **Copy / Share for Accountant:** 1-tap **Copy for Accountant** creates a clean, professional summary ready to email or WhatsApp directly to your bookkeeper or accountant.
 
-### Important: HMRC Record Keeping & AI Verification Notice
+### Important: Statutory Financial Notices & HMRC Record-Keeping Footers
+- **AI Tool Disclaimer:** Both the **Quotes & Invoices** and **Expenses & Bookkeeping** ledgers feature unobtrusive footer notices reminding users that TribeTrade is an AI assistant and productivity tool, not a certified accountant or registered tax adviser. All figures, VAT estimates, CIS deductions, and MTD totals must be checked prior to submission.
 - **Ephemeral Image Processing:** To protect your privacy and reduce storage costs, **receipt images are never stored in the database or cloud storage**. Images are processed in short-lived memory by AI and immediately discarded.
-- **5 to 6 Year Physical Receipt Rule:** Under UK tax law (TMA 1970 s12B / VATA 1994), sole traders must keep original physical or digital records for at least **5 years** and limited companies for **6 years** from the 31 January tax return deadline. **Always keep your paper receipts or personal digital copies in a safe place.**
-- **Verify Extracted Numbers:** Optical character recognition (OCR) can occasionally misread faded till slips. You must verify all figures prior to saving.
+- **5 to 6 Year Physical Receipt Rule:** Under UK tax legislation (TMA 1970 s12B / VATA 1994), sole traders must keep original physical or digital records for at least **5 years** and limited companies for **6 years** from the 31 January tax return deadline. **Always retain your original paper receipts or personal digital copies for HMRC inspection.**
+- **Verify Extracted Numbers:** Optical character recognition (OCR) can occasionally misread faded till slips or thermal paper. Always check and verify extracted numbers before saving.
+
+---
+
+## 8. Van Mileage Log & Automated Route Calculation (HMRC 45p/mi)
+
+Accessible from **Expenses** (tap **Van Mileage Log**) or from **Settings > Fleet & MOT**, the Van Mileage Log tracks business journeys, customer call-outs, and merchant trips for HMRC simplified vehicle tax deductions (45p per business mile up to 10,000 miles):
+
+- **Vehicle Dropdown Selection:** Select any vehicle registered in your Fleet & MOT settings directly from a clean dropdown list (e.g. *Ford Transit (VA21 XYZ)*). If driving a temporary replacement or hire van, choose `+ Different / Hire Vehicle` to log custom details.
+- **Base Workshop Address Auto-Fill:** The **From (Start)** field automatically populates with your real registered business address and postcode from **Settings > Business & Rates** (e.g. *Unit 4 Trade Park, Guildford GU1 4RF*). Tap **Use Base** at any time to instantly reset the starting point to your workshop or home depot.
+- **Automated Road Route Calculation:** Enter your client site address or UK postcode into **To / Client Site** and tap **⚡ Calculate Miles**:
+  - The built-in driving engine resolves UK postcodes and road routes to calculate exact road driving distance in miles.
+  - **No Google Cloud API Keys Required:** Runs on high-speed UK open data (Postcodes.io and OSRM road network), costing £0 and requiring zero setup.
+- **1-Tap Return Trip (2x):** Tap **🔁 Return Trip (2x)** to automatically double one-way mileage for round-trip callouts.
+- **Export Accountant CSV:** Download a detailed travel report including dates, reg, purpose, start/end locations, odometer readings, and claim values formatted for your annual tax return or bookkeeper.
 
 ---
 
@@ -277,7 +301,22 @@ TribeTrade's voice engine is engineered for busy UK tradespeople on the road:
 
 ---
 
-## 11. Settings Organisation & Sub-Menu Navigation
+## 11. Unified Navigation & Slide-Out Drawer
+
+TribeTrade replaces the cluttered horizontal menu bar with a streamlined, full-height **Navigation Drawer** across all devices (mobile, tablet, and desktop), providing an identical, distraction-free experience to Tribe Family Hub:
+
+- **Clean Viewport:** The horizontal bar across the page has been completely removed, reclaiming vertical screen space for Hub job cards, live quotes, and the morning briefing.
+- **Top-Right Menu Burger (☰):** Tapping or clicking the burger icon smoothly slides out the Navigation Drawer:
+  - **Account & Plan Status:** Displays your active trade login and current plan badge (*Trial Days Remaining*, *Premium*, or *Free Tier*).
+  - **Core Navigation:** Instant 1-tap jump to **Hub (Home)** and **Calendar**.
+  - **Business Workflow:** Dedicated links to **Quotes & Invoices**, **Expenses**, **Tasks**, **Supplies (The Shed)**, **Email**, and **Support**.
+  - **System & Help:** Direct access to **Settings & Sync** and the **User Guide**.
+  - **Sign Out:** Secure 1-tap sign-out at the base of the drawer.
+- **Dismissal:** Automatically closes when an option is selected, when clicking the backdrop, or by pressing the Escape key.
+
+---
+
+## 12. Settings Organisation & Sub-Menu Navigation
 
 To ensure Settings remains clean, fast, and uncluttered on mobile and desktop screens, the page is organized into dedicated tabs with no overwhelming "All" list:
 - **Category Sub-Menu Filter Pills:** Tap horizontal filter pills across the top to quickly jump between focused sections:
@@ -293,7 +332,7 @@ To ensure Settings remains clean, fast, and uncluttered on mobile and desktop sc
 
 ---
 
-## 12. Connected Email Accounts & Resilient Cloud Sync
+## 13. Connected Email Accounts & Resilient Cloud Sync
 
 TribeTrade connects directly to your trade email inboxes to sync client enquiries, merchant delivery notes, and supplier invoices:
 - **Supported Providers:** Gmail, Microsoft Outlook / Office 365, Sky / Yahoo Mail, and Apple Mail (iCloud).
@@ -302,7 +341,7 @@ TribeTrade connects directly to your trade email inboxes to sync client enquirie
 
 ---
 
-## 13. Multi-Device Protection & Device Swapping (Max 4 Devices)
+## 14. Multi-Device Protection & Device Swapping (Max 4 Devices)
 
 To protect account security and prevent excessive account sharing, TribeTrade enforces an automated multi-device management policy:
 
@@ -317,9 +356,18 @@ To protect account security and prevent excessive account sharing, TribeTrade en
   - If your 2 monthly swaps are exhausted, the Device Gate displays an informative notice showing the exact date your next device change will unlock.
 - **Managing Devices in Settings:** View all currently registered devices, see which device is currently active, and inspect remaining monthly swaps under **Settings > Registered Devices**.
 
+### 13.3 Admin Device Reset
+- If you are the account administrator, a **Reset Devices (Admin)** button appears on the Device Gate screen alongside the standard Recheck and Sign Out controls, and also at the bottom of the **Settings > Accounts > Registered Devices** section.
+- Tapping this button clears **all** registered device slots and resets the monthly swap history to zero, allowing you to start fresh.
+- This is useful when testing on multiple devices or when a clean slate is needed without waiting for swaps to regenerate.
+
+### 13.4 Admin Subscription Override
+- If you are the account administrator and your subscription is not currently Premium, a **Force Set Premium (Admin Override)** button appears in the **Settings > Billing > Subscription & Plan** section.
+- Tapping this button directly sets the `subscriptionTier` to `'premium'` on your `trade_users` Firestore document, bypassing Stripe.
+
 ---
 
-## 14. Privacy & Legal Policies
+## 15. Privacy & Legal Policies
 
 You can inspect TribeTrade's complete UK data protection and privacy policies at any time:
 - In **Settings**, navigate to the **Privacy & Legal** section to view the **Privacy Policy** and **Terms of Service**.
@@ -328,7 +376,7 @@ You can inspect TribeTrade's complete UK data protection and privacy policies at
 
 ---
 
-## 15. Managing & Deleting Your Account
+## 16. Managing & Deleting Your Account
 
 If you ever wish to permanently close your account and delete your stored trade business data:
 

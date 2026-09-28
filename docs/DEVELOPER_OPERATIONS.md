@@ -288,13 +288,14 @@ Cloud Functions are deployed separately from the [functions/](file:///c:/GitHub/
 | Runtime | Node.js 22 |
 | Region | `europe-west2` |
 | Max instances | 10 |
+| Audio Cache Bucket | `tribetrader-audio-cache` in `europe-west2` (or `STORAGE_BUCKET` env var) |
 | Source | `functions/src/index.ts` → compiled to `functions/lib/index.js` |
 
 #### Deploying Functions
 
 ```bash
 # Deploy functions only (predeploy script runs tsc build automatically)
-firebase deploy --only functions
+firebase deploy --only functions --force
 ```
 
 The predeploy step in `firebase.json` runs `npm --prefix "$RESOURCE_DIR" run build` (TypeScript compilation) before uploading.
@@ -476,6 +477,23 @@ VITE_APPCHECK_DEBUG_TOKEN="your-debug-token"
 VITE_RECAPTCHA_SITE_KEY="your-recaptcha-site-key"
 ```
 
+### 8.3 Google Cloud API Key Restrictions (Firebase AI Logic)
+
+If the Firebase Web API key has API restrictions enabled in Google Cloud Console (`restrictions.apiTargets`), it must include `firebasevertexai.googleapis.com` and `generativelanguage.googleapis.com` in addition to Firestore and Identity services, otherwise client-side calls to Gemini models via Firebase AI Logic will fail with `403 API_KEY_SERVICE_BLOCKED`:
+
+```bash
+gcloud services api-keys update projects/<PROJECT_NUMBER>/locations/global/keys/<KEY_ID> \
+  --api-target=service=firestore.googleapis.com \
+  --api-target=service=storage-component.googleapis.com \
+  --api-target=service=firebaseappcheck.googleapis.com \
+  --api-target=service=firebaseinstallations.googleapis.com \
+  --api-target=service=identitytoolkit.googleapis.com \
+  --api-target=service=securetoken.googleapis.com \
+  --api-target=service=firebasevertexai.googleapis.com \
+  --api-target=service=generativelanguage.googleapis.com
+```
+
 ---
 
-*This document reflects the Tribe codebase as of 14 September 2026. It was generated entirely from the live configuration files without reference to any pre-existing documentation.*
+*This document reflects the TribeTrade codebase as of 28 September 2026. It incorporates the van mileage logs, quote & invoice lifecycle states, Smart Capture trade scribble recognition, and mobile settings responsive layout.*
+

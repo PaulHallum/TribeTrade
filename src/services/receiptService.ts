@@ -102,8 +102,7 @@ Return valid JSON with this exact structure:
         model: FLASH_3_1_LITE,
         systemInstruction,
         generationConfig: {
-          responseMimeType: 'application/json',
-          thinkingConfig: { thinkingBudget: 1024 }
+          responseMimeType: 'application/json'
         }
       });
 

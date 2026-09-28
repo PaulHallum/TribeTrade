@@ -133,7 +133,8 @@ export const getTribeAudioCached = onCall({ cors: true }, async (request) => {
   const dateStr = `${yyyy}_${mm}_${dd}`;
   const filePath = `audio_cache/${tradeUserId}/briefing_${dateStr}.mp3`;
 
-  const bucket = admin.storage().bucket("tribetrader.firebasestorage.app");
+  const bucketName = process.env.STORAGE_BUCKET || "tribetrader-audio-cache";
+  const bucket = admin.storage().bucket(bucketName);
   const file = bucket.file(filePath);
 
   try {

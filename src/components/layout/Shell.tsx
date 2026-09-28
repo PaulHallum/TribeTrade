@@ -47,6 +47,7 @@ import DashboardTour from '../dashboard/DashboardTour';
 import { SAMPLE_SCHOOL_CIRCULAR } from '../../data/sampleTemplates';
 import Weather from './Weather';
 import GoogleIcon from './GoogleIcon';
+import NavigationDrawer from './NavigationDrawer';
 import AuthScreen from '../auth/AuthScreen';
 import GoogleReauthModal from '../auth/GoogleReauthModal';
 import { generateDailyBriefing } from '../../services/gemini';
@@ -70,6 +71,7 @@ export default function Shell() {
   const { showToast } = useToast();
   const { settings, updateSettings } = useSettings();
   const { subscriptionTier, isTrial, trialDaysRemaining, trialHasEnded } = useSubscriptionTier();
+  const activeThemeColor = (!isTrial && subscriptionTier === 'free') ? '#10b981' : (settings?.themeColor || '#10b981');
   const [dailyUses, setDailyUses] = useState(0);
   const [resetTime, setResetTime] = useState('');
   const [isOnboarding, setIsOnboarding] = useState(false);
@@ -141,23 +143,7 @@ export default function Shell() {
   const [activeView, setActiveView] = useState<View>('hub');
   const [activeTab, setActiveTab] = useState<string | null>(null);
   const [initialItemId, setInitialItemId] = useState<string | null>(null);
-  const [canScrollRight, setCanScrollRight] = useState(true);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-
-  const checkScroll = () => {
-    if (scrollContainerRef.current) {
-      const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
-      setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 5);
-      setCanScrollLeft(scrollLeft > 5);
-    }
-  };
-
-  useEffect(() => {
-    checkScroll();
-    window.addEventListener('resize', checkScroll);
-    return () => window.removeEventListener('resize', checkScroll);
-  }, [user]);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   
   // Handle Android/Browser back button and Deep Links
   useEffect(() => {
@@ -418,20 +404,7 @@ export default function Shell() {
     showToast('Dashboard synced with Google', 'success');
   };
 
-  const navItems = [
-    { id: 'hub', label: 'Hub', icon: LayoutDashboard },
-    { id: 'calendar', label: 'Calendar', icon: Calendar },
-    { id: 'quotes', label: 'Quotes', icon: FileText },
-    { id: 'expenses', label: 'Expenses', icon: ReceiptPoundSterling },
-    { id: 'tasks', label: 'Tasks', icon: CheckSquare },
-    { id: 'supplies', label: 'Supplies', icon: Package },
-    { id: 'email', label: 'Email', icon: Mail },
-  ];
-
   const isAdmin = user?.email === 'paulhallum@gmail.com' || user?.email === 'paulhallum@googlemail.com';
-  if (isAdmin) {
-    navItems.push({ id: 'support', label: 'Support', icon: Shield });
-  }
 
   const handleGenerateBriefing = async (forceRefresh: boolean | any = false) => {
     if (!user) return;
@@ -513,16 +486,13 @@ export default function Shell() {
 
       // 2. Save lastBriefingAt timestamp to the user's Firestore profile first
       try {
-        const { updateDoc } = await import('firebase/firestore');
+        const { setDoc } = await import('firebase/firestore');
         const userRef = doc(db, 'users', user.uid);
-        await updateDoc(userRef, {
+        await setDoc(userRef, {
           lastBriefingAt: serverTimestamp()
-        });
+        }, { merge: true });
       } catch (e: any) {
-        logger.error('Failed to update briefing timestamp (rate limit)', e);
-        showToast("Check back later", "warning");
-        setIsGenerating(false);
-        return;
+        logger.warn('Failed to update briefing timestamp (rate limit)', e);
       }
 
       const content = await generateDailyBriefing(
@@ -601,9 +571,18 @@ export default function Shell() {
       {!isOnboarding && (
         <header className="h-14 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] flex items-center pl-4 pr-2 sm:pr-3 z-30 shrink-0 transition-all justify-between w-full">
         <div className="flex items-center gap-1.5 min-w-0 shrink-0">
-          <div className="w-9 h-9 flex items-center justify-center shrink-0">
-            <img src="/logo.png" alt="Tribe Logo" className="w-full h-full object-contain" />
-          </div>
+          <button
+            onClick={() => navigateToView('hub')}
+            className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-2.5 h-8 sm:h-9 bg-white dark:bg-white rounded-xl sm:rounded-2xl border border-zinc-200/90 dark:border-zinc-300 shadow-sm hover:shadow hover:scale-[1.02] active:scale-95 transition-all duration-200 cursor-pointer group shrink-0"
+            title="Go to TribeTrade Hub"
+          >
+            <div className="w-5 h-5 sm:w-5.5 sm:h-5.5 flex items-center justify-center shrink-0 overflow-hidden rounded-md">
+              <img src="/logo.png" alt="Tribe Logo" className="w-full h-full object-contain" />
+            </div>
+            <span className="text-[12px] sm:text-xs font-black tracking-tight text-zinc-900 select-none">
+              Tribe<span style={{ color: activeThemeColor }}>Trade</span>
+            </span>
+          </button>
           {!navigator.onLine && (
             <div className="flex items-center gap-1.5 px-2 py-0.5 bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 text-[9px] font-black uppercase tracking-widest rounded-full border border-amber-100 dark:border-amber-800/20 ml-2">
               <WifiOff className="w-3 h-3" />
@@ -631,24 +610,62 @@ export default function Shell() {
           <button
             onClick={() => {
               if (user) {
-                navigateToView(activeView === 'settings' ? 'hub' : 'settings');
+                setIsDrawerOpen(prev => !prev);
               } else {
                 signIn();
               }
             }}
-            className={`p-2 rounded-xl transition-all flex items-center justify-center shrink-0 ${
-              activeView === 'settings' && user
-                ? 'bg-emerald-500 text-white' 
-                : 'hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400'
-            }`}
-            title={user ? "Menu" : "Sign In"}
+            className="relative overflow-hidden group flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 h-8 sm:h-9 rounded-xl sm:rounded-2xl border transition-all duration-300 shrink-0 shadow-sm active:scale-95 cursor-pointer"
+            style={{
+              backgroundColor: isDrawerOpen && user ? activeThemeColor : `${activeThemeColor}14`,
+              borderColor: isDrawerOpen && user ? activeThemeColor : `${activeThemeColor}40`,
+              boxShadow: isDrawerOpen && user 
+                ? `0 4px 14px ${activeThemeColor}55` 
+                : `0 2px 10px ${activeThemeColor}20`
+            }}
+            title={user ? (isDrawerOpen ? "Close Menu" : "Open Menu") : "Sign In"}
           >
+            {/* Shimmer sweep animation (like the Briefing button) */}
+            {user && !isDrawerOpen && (
+              <motion.div 
+                className="absolute top-0 bottom-0 w-[160%] pointer-events-none -skew-x-12 z-0 opacity-80"
+                style={{
+                  background: `linear-gradient(90deg, transparent 0%, ${activeThemeColor}35 30%, rgba(255, 255, 255, 0.85) 50%, ${activeThemeColor}35 70%, transparent 100%)`
+                }}
+                animate={{ left: ['-160%', '160%'] }}
+                transition={{ repeat: Infinity, duration: 2.2, ease: "easeInOut", repeatDelay: 1.8 }}
+              />
+            )}
+
             {user ? (
-              <div className="flex flex-col justify-center items-end w-5 h-5 relative">
-                <span className={`block absolute h-[2px] rounded-full transition-all duration-300 ease-in-out ${activeView === 'settings' ? 'w-5 bg-white rotate-45' : 'w-5 bg-current -translate-y-[5px]'}`}></span>
-                <span className={`block absolute h-[2px] rounded-full transition-all duration-300 ease-in-out ${activeView === 'settings' ? 'w-5 bg-white opacity-0 translate-x-2' : 'w-5 bg-current'}`}></span>
-                <span className={`block absolute h-[2px] rounded-full transition-all duration-300 ease-in-out ${activeView === 'settings' ? 'w-5 bg-white -rotate-45' : 'w-3 bg-current translate-y-[5px]'}`}></span>
-              </div>
+              <>
+                <div className="flex flex-col justify-center items-end w-4 h-4 sm:w-4.5 sm:h-4.5 relative z-10">
+                  <span 
+                    className={`block absolute h-[2px] rounded-full transition-all duration-300 ease-in-out ${
+                      isDrawerOpen ? 'w-4 sm:w-4.5 rotate-45' : 'w-4 sm:w-4.5 -translate-y-[4px] sm:-translate-y-[4.5px]'
+                    }`}
+                    style={{ backgroundColor: isDrawerOpen ? '#ffffff' : activeThemeColor }}
+                  />
+                  <span 
+                    className={`block absolute h-[2px] rounded-full transition-all duration-300 ease-in-out ${
+                      isDrawerOpen ? 'w-4 sm:w-4.5 opacity-0 translate-x-2' : 'w-4 sm:w-4.5'
+                    }`}
+                    style={{ backgroundColor: isDrawerOpen ? '#ffffff' : activeThemeColor }}
+                  />
+                  <span 
+                    className={`block absolute h-[2px] rounded-full transition-all duration-300 ease-in-out ${
+                      isDrawerOpen ? 'w-4 sm:w-4.5 -rotate-45' : 'w-2.5 sm:w-3 translate-y-[4px] sm:translate-y-[4.5px]'
+                    }`}
+                    style={{ backgroundColor: isDrawerOpen ? '#ffffff' : activeThemeColor }}
+                  />
+                </div>
+                <span 
+                  className="text-[11px] sm:text-xs font-bold tracking-tight relative z-10 transition-colors"
+                  style={{ color: isDrawerOpen ? '#ffffff' : activeThemeColor }}
+                >
+                  {isDrawerOpen ? 'Close' : 'Menu'}
+                </span>
+              </>
             ) : (
               <GoogleIcon className="w-5 h-5" isColoured={true} />
             )}
@@ -708,54 +725,7 @@ export default function Shell() {
         </>
       )}
 
-      {/* Sub-navigation */}
-      {user && !isOnboarding && (
-        <div className="relative bg-[var(--bg-secondary)] border-b border-[var(--border-color)]">
-          <div 
-            ref={scrollContainerRef}
-            onScroll={checkScroll}
-            className="px-4 py-1.5 overflow-x-auto no-scrollbar transition-all relative z-10"
-          >
-            <nav className="max-w-7xl mx-auto flex items-center gap-1">
-              {navItems.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => navigateToView(item.id as View)}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all whitespace-nowrap ${
-                    activeView === item.id 
-                      ? 'bg-emerald-50 dark:bg-emerald-900/20 font-semibold' 
-                      : 'text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-                  }`}
-                  style={activeView === item.id ? { color: 'var(--icon-color)' } : {}}
-                >
-                  <item.icon className="w-3.5 h-3.5 shrink-0" />
-                  <span className="text-xs">{item.label}</span>
-                </button>
-              ))}
-            </nav>
-          </div>
-          {canScrollLeft && (
-            <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-[var(--bg-secondary)] via-[var(--bg-secondary)]/80 to-transparent pointer-events-none z-20 flex items-center justify-start pl-1 sm:hidden">
-              <motion.div
-                animate={{ x: [0, -5, 0] }}
-                transition={{ repeat: Infinity, duration: 1.2, ease: "easeInOut" }}
-              >
-                <ChevronLeft className="w-5 h-5 text-emerald-500 dark:text-emerald-400 stroke-[3]" />
-              </motion.div>
-            </div>
-          )}
-          {canScrollRight && (
-            <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-[var(--bg-secondary)] via-[var(--bg-secondary)]/80 to-transparent pointer-events-none z-20 flex items-center justify-end pr-1 sm:hidden">
-              <motion.div
-                animate={{ x: [0, 5, 0] }}
-                transition={{ repeat: Infinity, duration: 1.2, ease: "easeInOut" }}
-              >
-                <ChevronRight className="w-5 h-5 text-emerald-500 dark:text-emerald-400 stroke-[3]" />
-              </motion.div>
-            </div>
-          )}
-        </div>
-      )}
+
 
       {/* Main Content */}
       <main className="flex-1 relative overflow-hidden flex flex-col">
@@ -1033,6 +1003,19 @@ export default function Shell() {
           />
         )}
       </AnimatePresence>
+
+      <NavigationDrawer
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        activeView={activeView}
+        onNavigate={(view) => navigateToView(view)}
+        user={user}
+        subscriptionTier={subscriptionTier}
+        isTrial={isTrial}
+        trialDaysRemaining={trialDaysRemaining}
+        isAdmin={isAdmin}
+        themeColor={activeThemeColor}
+      />
 
       <PWAInstallBanner />
       <OfflineBanner />

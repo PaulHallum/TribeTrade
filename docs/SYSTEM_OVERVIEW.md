@@ -13,6 +13,7 @@ TribeTrade is a **UK-focussed trade operating system and business organisation p
 
 The main landing screen after login. It displays:
 
+- **Branded Navigation Pill** — High-contrast top-left pill button enclosing the trade logo on a crisp white surface with dynamic trade accent brand text (`TribeTrade`), matching the Shimmer Menu button and providing 1-tap navigation directly back to the Hub from any screen in both light and dark mode.
 - **Personalised Business Header** — Displays time-appropriate British English greetings dynamically combined with your business name from Settings (e.g. *"Good afternoon, Apex Electrical"*), eliminating unnecessary edit inputs.
 - **Trade Whiteboard** — A shared noticeboard at the top of the hub for posting temporary notes, job notices, and team reminders.
 - **Quotes & Estimates Overview** — Dedicated dashboard panel displaying active quotes, pending pipeline total in British Pounds (£), and status badges (Draft, Pending, Accepted, Declined). Clicking any quote opens the full vector PDF preview modal with WhatsApp sharing, PDF download, and status progression without leaving the Hub. Optimised into a clean 2-across grid on mobile devices.
@@ -37,7 +38,10 @@ The main landing screen after login. It displays:
 
 Situated directly next to Calendar in the main navigation, **Quotes & Invoices** provides a tactile, dual-view management tool for UK tradespeople:
 - **Quotes & Invoices Toggle** — Segmented control in the header (mirroring the Tasks & Notes toggle) allowing tradespeople to switch between client quotations and processed invoices.
-- **Status Workflow** — Tracks quotes across `draft`, `pending` (sent to client), `accepted`, and `declined` states, and invoices across `draft`, `sent`, `paid`, and `overdue` with real-time financial metrics (Total Quoted / Invoiced, Won / Paid Value, Pending / Outstanding Value).
+- **Status Workflow** — Tracks quotes across `draft`, `pending` (sent to client), `accepted`, and `declined` states, and invoices across `draft`, `sent`, `paid`, `completed`, and `overdue` with real-time financial metrics (Total Quoted / Invoiced, Won / Paid Value, Pending / Outstanding Value).
+- **Completed & Paid Automatic Turnover Sync** — Marking an invoice as `completed` or `paid` automatically creates/updates an income transaction in `trade_users/{tradeUserId}/transactions` under HMRC Box 10 (Turnover) with full net, VAT, and gross breakdown, instantly updating the Self Assessment helper and tax pot.
+- **Quick Quote Prompt Workflow (`isQuickQuote`)** — Quick quotes created from the Quick Add (`+`) bar are flagged with `isQuickQuote: true` and immediately open the full quote prompt editor with a dedicated header badge for rapid on-site pricing.
+- **Enhanced Modal Navigation & Dismissal** — Invoices and quotes editors and preview modals feature backdrop click-to-dismiss, Escape key listener dismissal, and dedicated footer Close actions for seamless navigation.
 - **Accepted Job Smart Convert Workflow (`QuoteAcceptanceModal`)** — When a quote is accepted, TribeTrade launches a smart operational pipeline:
   1. **Calendar Booking:** Calculates expected project length from labour line items and pre-fills appointment dates, customer contact info, and site address to book directly into the calendar.
   2. **The Shed Stock Cross-Reference:** Real-time lookup against `shedInventory` to verify what required materials and tools are already in stock, displaying **In Shed** stock badges.
@@ -73,10 +77,12 @@ Positioned immediately next to **Quotes** in the navigation bar, **Expenses** ma
 - **Task Categories** — Custom trade categories for organising tasks (e.g., First Fix, Second Fix, Certification, Site Cleanup).
 - **Support Tickets** — Users can submit support tickets (category + message), which are saved to Firestore and automatically converted into a private task on the admin's dashboard. An AI-powered fix suggestion is generated for each ticket.
 
-### 1.6 The Shed — Van Stock, Tool Vault & Consumables
+### 1.6 The Shed — Van Stock, Tool Vault, Consumables & Job Allocations
 
 - **Shed Inventory (`shedInventory`)** — Centralised inventory tracking for tools, power equipment, test instruments, and consumables stored in vans or lockups.
 - **Stock Tracking & Minimum Levels** — Monitors quantities, locations (Van 1, Lockup, Workshop), serial numbers, and calibration expiry dates.
+- **Job Allocations & Reserved Stock (`shedService`)** — Held stock items can be allocated and reserved directly to active Trade Invoices or custom direct jobs. Stock cards display visual `[x] reserved` indicator badges.
+- **Reserved Stock by Job Section** — Dedicated live-updating section at the bottom of The Shed grouped by invoice/job reference, detailing item quantities, prices, and one-tap return-to-shed actions.
 - **Job Cross-Referencing** — When quotes are converted to jobs, TribeTrade automatically checks The Shed to highlight in-stock materials and flag missing supplies.
 
 ### 1.7 Materials Pick Lists & Merchant Ordering
@@ -115,6 +121,8 @@ Positioned immediately next to **Quotes** in the navigation bar, **Expenses** ma
 - **Display & Trade Themes** — Clean display mode toggle (Light Mode / Dark Mode) and 9 trade accent themes (Electrician Amber, Plumber Sky Blue, Builder Slate, Carpenter Emerald, Heating Rose, etc.).
 - **Work Tablet PIN Lock** — Optional 4-digit PIN-protected security gate for shared site tablets and van devices (stored as a secure hash).
 - **Notification Preferences** — Push notification toggle for job reminders and compliance dates.
+- **Subscription & Billing Command Center** — Prominent, enlarged hero card under Account & Subscription with live plan badges (Active, Trial, Past Due), clear renewal date display, instant sync, and 1-click access to the Stripe Customer Portal for managing direct debits, cards, and VAT receipts.
+- **Resilient Firestore Serialization** — Configured with `ignoreUndefinedProperties: true` and payload sanitization across all services (quotes, invoices, mileage, and inventory) to prevent runtime serialization failures when saving optional fields.
 - **Connected Accounts & Resilient Cloud Sync** — Synchronise Gmail, Outlook, Yahoo, and Apple Mail inboxes. Supports Google App Passwords with a direct-to-Firestore cloud registration fallback (`trade_users/{tradeUserId}/connectedAccounts`) ensuring immediate, reliable connection across mobile PWAs and static hosting environments.
 
 ### 1.11 Push Notifications & Job Reminders
@@ -173,8 +181,9 @@ All frontend AI calls go through the `gemini.ts` and `smartCaptureService.ts` se
 - Thinking budget of 1024 tokens for reasoning.
 
 #### Smart Capture
-- Processes **text** (including raw HTML from emails/web pages) or **images** (camera/photo) to extract actionable items.
-- Extracts: tasks, calendar events, notes, shopping items, and recipes.
+- Processes **text** (including raw HTML from emails/web pages), **PDF supplier invoices/orders**, or **images** (camera/photo) to extract actionable items.
+- Automatically handles trade merchant orders (e.g. Screwfix, Toolstation, Travis Perkins) and itemises parts, materials, and consumables for "The Shed" inventory with interactive personal use exclusion options.
+- Extracts: tasks, calendar events, notes, shopping items, recipes, job quotes, and Shed inventory additions.
 - Includes date intelligence — past-dated tasks are clamped to today at 09:00.
 - Calendar events without a verified location are automatically downgraded to a task ("Check dates & location for [Event Title]").
 - RSVP tasks are scheduled 7 days after detection; gift-buying tasks are scheduled 7 days before events.
@@ -211,7 +220,7 @@ All frontend AI calls go through the `gemini.ts` and `smartCaptureService.ts` se
 
 - **Text-to-Speech (TTS)** — Neural voice (en-GB-Neural2-A) via Google Cloud TTS, delivered through Firebase Cloud Functions.
   - `getTribeAudio` — On-demand audio synthesis.
-  - `getTribeAudioCached` — Daily briefing audio cached in Firebase Storage with 30-day signed URLs.
+  - `getTribeAudioCached` — Daily briefing audio cached in Cloud Storage (`tribetrader-audio-cache`) with 30-day signed URLs.
 - **Speech-to-Text** — Voice input via the browser's built-in `SpeechRecognition` / `webkitSpeechRecognition` API for the AI chat input.
 - **Fallback** — If Cloud TTS fails or the user is offline, falls back to the browser's native `SpeechSynthesis` API (en-GB voice preferred).
 - **Audio Caching** — Uses the Cache API to store previously generated audio for instant replay.
@@ -446,10 +455,54 @@ support_tickets/{ticketId}        — User-submitted support tickets
 
 ---
 
-## 5. Related Architecture & Spin-Offs
+### 4.8 Van Mileage Log & HMRC Simplified Expenses
 
-- **[Tribe Trade / Small Business Blueprint](file:///c:/GitHub/Tribe/docs/SPINOFF_TRADESPERSON_BLUEPRINT.md)** — Architectural, functional, and integration blueprint for the small business and tradesperson spin-off PWA, detailing shared Firebase infrastructure, namespace isolation, Gemini AI receipt OCR, HMRC self-assessment exports, and mobile ergonomics.
+- **Collection:** `trade_users/{tradeUserId}/mileageEntries`
+- **HMRC Rate:** £0.45 per business mile for the first 10,000 miles (HMRC simplified vehicle expenses).
+- **Service:** `mileageService.ts` (`saveMileageEntry`, `deleteMileageEntry`, `subscribeMileageEntries`, `generateMileageCsv`) and `routeService.ts` (`calculateDrivingDistance`, `extractUkPostcode`).
+- **UI:** `MileageLogModal.tsx` accessible from Expenses & Bookkeeping and Vehicle & Fleet Compliance.
+  - **Dynamic Fleet Dropdown:** Directly synchronises with registered vehicles in `trade_users/{tradeUserId}/vehicles`, rendering an immediate dropdown list with registration plates, plus a fallback for custom/hire vans.
+  - **Base Workshop Address Auto-Fill:** Automatically resolves the user's trading workshop address and postcode from `Settings > Business & Rates` and populates the starting point, complete with a 1-tap "Use Base" reset button.
+  - **Automated Road Route Calculation:** Leverages UK open postcode geocoding (Postcodes.io) and OSRM road routing engine to calculate driving distance in miles with zero API fees or Google Cloud configuration required.
+  - **1-Tap Return Trip (2x):** Instantly doubles calculated one-way mileage for round-trip call-outs.
+- **Job Quotes & Invoices Integration:** Direct "+ Add Mileage" button in `QuoteEditorModal` and `InvoiceEditorModal` to append standard mileage charges (e.g. 30 miles @ £0.45/mi) as an itemised line item.
+- **Export:** Instant HMRC-compliant CSV download containing date, vehicle, reg, purpose, start/end locations, odometer readings, miles, rate, and claim value.
+
+### 4.9 Quotation & Invoicing Lifecycle & Financial Oversight
+
+- **Status Workflow:** Quotes support `draft`, `sent`, `pending`, `accepted`, and `declined`. Invoices support `draft`, `sent`, `paid`, and `overdue`.
+- **Quote-to-Invoice Conversion & Reversion:** Converted quotes disappear from active quotes by default (accessible via "Converted to Invoice" tab). Converted invoices can be reverted back to active quotations (`revertInvoiceToQuote`), safely restoring the quote and voiding the invoice.
+- **Accounting Export:** "Export Invoices (CSV)" provides full financial summary downloads formatted for Xero and accountant reconciliation.
+- **Statutory Financial & HMRC Compliance Notices:** Unobtrusive footer disclaimers on financial views (Quotes & Invoices and Expenses & Bookkeeping, alongside Self Assessment and Editors) affirming that TribeTrade is an AI trade assistant and productivity tool, not a certified accountant or registered tax adviser (with all figures verified before HMRC submission), paired with UK statutory record-keeping requirements (TMA 1970 s12B) on Expenses to retain original receipts for 5–6 years.
+- **Trade Scribble OCR Intelligence:** Multimodal AI extracts handwritten paper notes, trade scribbles, and merchant receipts, accurately classifying them as Quotes (`CREATE_QUOTE`), The Shed materials shopping lists (`CREATE_SHOPPING_ITEM`), Calendar appointments (`CREATE_CALENDAR_EVENT`), or Tasks (`CREATE_TASK`).
+
+### 4.10 The Shed Inventory & Job Allocation System
+
+- **Collection:** `trade_users/{tradeUserId}/shedInventory` (holding stock) and `trade_users/{tradeUserId}/shedAllocations` (audit trail of materials assigned to client jobs).
+- **Service:** `shedService.ts` (`addOrUpdateShedStock`, `assignStockToJob`, `getRecentShedAllocations`).
+- **Smart Receipt & Notes Auto-Assignment (`ADD_TO_SHED_STOCK`):** When Smart Convert or Smart Capture processes an email, PDF invoice, till receipt, delivery note, or list of parts (e.g. from Screwfix, Travis Perkins, Toolstation), it itemises every part with quantity, category, and price into an `ADD_TO_SHED_STOCK` action.
+  - **Personal Use Stock Exclusion:** All parts are assumed to be business stock to update The Shed by default. Users are provided with interactive exclusion checkboxes to untick any item purchased for personal use rather than for business/job stock. Only included items update holding quantities in The Shed; excluded personal items are omitted with an explicit confirmation toast.
+- **Stock-to-Job Assignment (`AssignStockModal.tsx`):** Tradespeople can assign holding stock from The Shed directly to an active Quote, Invoice, or custom job. Confirming the assignment decrements holding stock in The Shed, automatically appends an itemised material line item to the target Quote/Invoice with recalculated net and gross totals, and records the allocation in `shedAllocations`.
+- **Usage Service Non-Transactional Locking:** Daily usage counters in `usageService.ts` read parent profile and settings documents non-transactionally with `getDoc` before executing a targeted transaction strictly on the daily `usage/{date}` document, completely eliminating Firestore `failed-precondition` commit errors.
+
+### 4.11 Unified Navigation & Slide-Out Drawer
+
+- **Component:** `NavigationDrawer.tsx` integrated directly into `Shell.tsx`.
+- **Elimination of Horizontal Sub-Menu:** The horizontal sub-navigation bar has been completely removed across all screen sizes (mobile, tablet, and desktop), eliminating horizontal scrolling and discoverability drop-off while maximising vertical screen space for Hub cards, live quotes, and the morning briefing.
+- **Top Bar Burger Toggle:** A themed, high-visibility button in the top navigation bar featuring a dynamic light-beam shimmer animation (matching the Morning Briefing button aesthetics). It automatically adapts its background tint, border, ambient glow, burger bars, and active state to the user's selected app theme colour (e.g. Mercedes, Ferrari, McLaren, Aston Martin, Williams), morphing seamlessly into an 'X' close toggle with a responsive label ('Menu' / 'Close') when the drawer is open.
+  - **Account & Tier Badge:** Displays the authenticated email address alongside active plan status (*Premium*, *Trial days remaining*, or *Free Tier*).
+  - **Core Navigation:** Grouped access to **Hub (Home)** and **Calendar**.
+  - **Business Workflow:** Grouped access to **Quotes & Invoices**, **Expenses**, **Tasks**, **Supplies (The Shed)**, **Email**, and **Support**.
+  - **System & Preferences:** Quick jumps to **Settings & Sync** and the **User Guide**.
+  - **1-Tap Sign Out:** Clean logout button at the drawer base.
+  - **Backdrop & Dismissal:** Closes automatically on item selection, clicking outside the drawer, or pressing the `Escape` key.
 
 ---
 
-*This document reflects the Tribe codebase as of 14 September 2026. It was generated entirely from the live source code without reference to any pre-existing documentation.*
+## 5. Related Architecture & Spin-Offs
+
+- **[Tribe Trade / Small Business Blueprint](file:///c:/GitHub/TribeTrade/docs/SPINOFF_TRADESPERSON_BLUEPRINT.md)** — Architectural, functional, and integration blueprint for the small business and tradesperson spin-off PWA, detailing shared Firebase infrastructure, namespace isolation, Gemini AI receipt OCR, HMRC self-assessment exports, and mobile ergonomics.
+
+---
+
+*This document reflects the TribeTrade codebase as of 28 September 2026.*

@@ -136,10 +136,10 @@ export default function SelfAssessmentModal({
             <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
             <div className="space-y-1 text-xs">
               <span className="font-bold text-amber-900 dark:text-amber-200 block">
-                Important Notice: For Planning & Preparation Only (Not Formal Tax Advice)
+                Important Notice: AI Assistant Tool (Not an Accountant or Formal Tax Adviser)
               </span>
               <p className="text-[11px] text-amber-800/90 dark:text-amber-300/90 leading-relaxed">
-                This assistant is an organisational tool designed to help UK sole traders compile records for their accountant or annual Self Assessment return. It is <strong>NOT a tax calculation tool, chartered tax advice, or an HMRC filing portal</strong>. Final tax liabilities depend on individual circumstances, other employment income, student loans, and capital allowances. Always verify your return with a qualified accountant or official HMRC guidance.
+                TribeTrade is an AI trade assistant and organisational tool, <strong>not a certified accountant or registered tax adviser</strong>. All figures, VAT estimates, turnover calculations, and expense totals must be reviewed and checked by you or a qualified accountant before submission to HMRC. It is not an official HMRC filing portal.
               </p>
             </div>
           </div>

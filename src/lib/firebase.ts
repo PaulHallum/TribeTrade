@@ -60,6 +60,7 @@ setPersistence(auth, browserLocalPersistence).catch((error) => {
 
 // Modern Offline Persistence (Cost & Performance Optimization)
 export const db = initializeFirestore(app, {
+  ignoreUndefinedProperties: true,
   localCache: persistentLocalCache({
     tabManager: persistentMultipleTabManager()
   })

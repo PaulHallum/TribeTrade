@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   X, 
   Share2, 
@@ -8,14 +8,16 @@ import {
   CheckCircle2, 
   Clock, 
   XCircle, 
-  FileText,
+  FileText, 
   Building,
   User,
   MapPin,
   Calendar,
   CreditCard,
   Sparkles,
-  Loader2
+  Loader2,
+  Send,
+  ShieldAlert
 } from 'lucide-react';
 import { Quote, BusinessDetails } from '../../types/quote';
 import { 
@@ -49,6 +51,15 @@ export default function QuotePreviewModal({
   const { showToast } = useToast();
   const [sharing, setSharing] = useState(false);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen || !quote) return null;
 
   const handleNativeShare = async () => {
@@ -81,6 +92,12 @@ export default function QuotePreviewModal({
 
   const getStatusBadge = (status: Quote['status']) => {
     switch (status) {
+      case 'sent':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
+            <Send className="w-3.5 h-3.5" /> Sent
+          </span>
+        );
       case 'accepted':
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
@@ -109,7 +126,10 @@ export default function QuotePreviewModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-zinc-950/70 backdrop-blur-sm overflow-y-auto">
+    <div 
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-zinc-950/70 backdrop-blur-sm overflow-y-auto"
+    >
       <div className="relative w-full max-w-3xl bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header Bar */}
         <div className="px-6 py-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between shrink-0 bg-zinc-50/50 dark:bg-zinc-800/30">
@@ -277,6 +297,12 @@ export default function QuotePreviewModal({
               {quote.notes || businessDetails.defaultQuoteTerms}
             </div>
           )}
+
+          {/* Financial Disclaimer */}
+          <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center gap-2 text-[11px] text-amber-800 dark:text-amber-300">
+            <ShieldAlert className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
+            <span>AI trade assistant tool. All pricing and calculations must be verified by you or your accountant.</span>
+          </div>
         </div>
 
         {/* Footer Action Controls */}
@@ -297,6 +323,17 @@ export default function QuotePreviewModal({
             >
               <Download className="w-3.5 h-3.5" /> Download
             </button>
+
+            {quote.status !== 'sent' && quote.status !== 'accepted' && onStatusChange && (
+              <button
+                onClick={() => onStatusChange(quote.id, 'sent')}
+                className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
+                title="Mark Quote as Sent to Client"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>Mark Sent</span>
+              </button>
+            )}
 
             {quote.status === 'accepted' ? (
               onOpenAcceptanceModal && (
@@ -327,6 +364,13 @@ export default function QuotePreviewModal({
           </div>
 
           <div className="flex items-center gap-2 ml-auto">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3.5 py-2 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white rounded-xl text-xs font-bold transition-colors"
+            >
+              Close
+            </button>
             <button
               onClick={handleNativeShare}
               disabled={sharing}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   X, 
   Share2, 
@@ -15,7 +15,10 @@ import {
   MapPin,
   Calendar,
   CreditCard,
-  Loader2
+  Loader2,
+  RotateCcw,
+  ShieldAlert,
+  Send
 } from 'lucide-react';
 import { Invoice, BusinessDetails } from '../../types/quote';
 import { 
@@ -32,6 +35,7 @@ interface InvoicePreviewModalProps {
   businessDetails: BusinessDetails;
   onEdit?: (invoice: Invoice) => void;
   onStatusChange?: (invoiceId: string, status: Invoice['status']) => void;
+  onRevertToQuote?: (invoice: Invoice) => void;
 }
 
 export default function InvoicePreviewModal({
@@ -40,10 +44,20 @@ export default function InvoicePreviewModal({
   invoice,
   businessDetails,
   onEdit,
-  onStatusChange
+  onStatusChange,
+  onRevertToQuote
 }: InvoicePreviewModalProps) {
   const { showToast } = useToast();
   const [sharing, setSharing] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen || !invoice) return null;
 
@@ -77,6 +91,12 @@ export default function InvoicePreviewModal({
 
   const getStatusBadge = (status: Invoice['status']) => {
     switch (status) {
+      case 'completed':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-400 border border-teal-200 dark:border-teal-800">
+            <CheckCircle2 className="w-3.5 h-3.5" /> Completed
+          </span>
+        );
       case 'paid':
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
@@ -106,7 +126,10 @@ export default function InvoicePreviewModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+    <div 
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto"
+    >
       <div className="bg-white dark:bg-zinc-900 w-full max-w-3xl rounded-3xl shadow-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden my-auto max-h-[95vh] flex flex-col">
         {/* Top Header Bar */}
         <div className="p-4 sm:p-5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-800/40">
@@ -141,6 +164,7 @@ export default function InvoicePreviewModal({
               >
                 <option value="draft">Draft</option>
                 <option value="sent">Sent</option>
+                <option value="completed">Completed</option>
                 <option value="paid">Paid</option>
                 <option value="overdue">Overdue</option>
               </select>
@@ -329,6 +353,12 @@ export default function InvoicePreviewModal({
               {invoice.notes || businessDetails.defaultPaymentTerms}
             </div>
           )}
+
+          {/* Financial Disclaimer */}
+          <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center gap-2 text-[11px] text-amber-800 dark:text-amber-300">
+            <ShieldAlert className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
+            <span>AI trade assistant tool. All invoice figures and VAT calculations must be verified by you or your accountant.</span>
+          </div>
         </div>
 
         {/* Footer Action Controls */}
@@ -349,9 +379,38 @@ export default function InvoicePreviewModal({
             >
               <Download className="w-3.5 h-3.5" /> Download
             </button>
+
+            {invoice.status !== 'sent' && invoice.status !== 'paid' && onStatusChange && (
+              <button
+                onClick={() => onStatusChange(invoice.id, 'sent')}
+                className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
+                title="Mark Invoice as Sent to Client"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>Mark Sent</span>
+              </button>
+            )}
+
+            {invoice.quoteId && onRevertToQuote && (
+              <button
+                onClick={() => onRevertToQuote(invoice)}
+                className="px-3 py-2 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/50 text-amber-700 dark:text-amber-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border border-amber-200 dark:border-amber-800"
+                title="Revert back to active Quote"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Revert to Quote</span>
+              </button>
+            )}
           </div>
 
           <div className="flex items-center gap-2 ml-auto">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3.5 py-2 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white rounded-xl text-xs font-bold transition-colors"
+            >
+              Close
+            </button>
             <button
               onClick={handleNativeShare}
               disabled={sharing}

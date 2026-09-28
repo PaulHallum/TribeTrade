@@ -21,8 +21,9 @@ import {
   MAX_DEVICES,
   MAX_MONTHLY_SWAPS
 } from '../../services/deviceService';
-import { auth } from '../../lib/firebase';
+import { auth, db } from '../../lib/firebase';
 import { signOut } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
 import { useToast } from '../../contexts/ToastContext';
 
 interface DeviceGateProps {
@@ -36,6 +37,26 @@ export default function DeviceGate({ children }: DeviceGateProps) {
   const [checking, setChecking] = useState(true);
   const [deviceResult, setDeviceResult] = useState<DeviceVerificationResult | null>(null);
   const [swappingId, setSwappingId] = useState<string | null>(null);
+  const [resetting, setResetting] = useState(false);
+
+  const isAdmin = user?.email === 'paulhallum@gmail.com' || user?.email === 'paulhallum@googlemail.com';
+
+  const handleAdminReset = async () => {
+    if (!activeTradeUserId) return;
+    setResetting(true);
+    try {
+      await setDoc(doc(db, 'trade_users', activeTradeUserId), {
+        registeredDevices: [],
+        deviceSwapHistory: []
+      }, { merge: true });
+      showToast('All registered device slots and swaps have been reset', 'success');
+      await checkDevice();
+    } catch (err: any) {
+      showToast('Reset failed: ' + err.message, 'error');
+    } finally {
+      setResetting(false);
+    }
+  };
 
   const activeTradeUserId = tradeUserId || (user ? `trade_${user.uid}` : null);
 
@@ -249,14 +270,28 @@ export default function DeviceGate({ children }: DeviceGateProps) {
         )}
 
         {/* Footer Actions */}
-        <div className="pt-2 flex items-center justify-between border-t border-zinc-800">
-          <button
-            onClick={checkDevice}
-            className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-all"
-          >
-            <RotateCw className="w-3.5 h-3.5" />
-            <span>Recheck</span>
-          </button>
+        <div className="pt-2 flex flex-wrap items-center justify-between gap-2 border-t border-zinc-800">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={checkDevice}
+              className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-all"
+            >
+              <RotateCw className="w-3.5 h-3.5" />
+              <span>Recheck</span>
+            </button>
+
+            {isAdmin && (
+              <button
+                onClick={handleAdminReset}
+                disabled={resetting}
+                className="px-3 py-2 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-400 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-all disabled:opacity-50 active:scale-95 shadow-sm"
+                title="Reset all registered devices and monthly swap history (Admin only)"
+              >
+                {resetting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCw className="w-3.5 h-3.5" />}
+                <span>Reset Devices (Admin)</span>
+              </button>
+            )}
+          </div>
 
           <button
             onClick={handleSignOut}

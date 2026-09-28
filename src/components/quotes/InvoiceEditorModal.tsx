@@ -14,7 +14,9 @@ import {
   MapPin, 
   FileText,
   CreditCard,
-  Loader2
+  Loader2,
+  Truck,
+  ShieldAlert
 } from 'lucide-react';
 import { Invoice, QuoteItem, BusinessDetails } from '../../types/quote';
 import { formatCurrency } from '../../services/quotePdfService';
@@ -210,6 +212,7 @@ export default function InvoiceEditorModal({
       showToast('Invoice saved successfully', 'success');
 
       if (andPreview && onSaveAndPreview) {
+        onClose();
         onSaveAndPreview({
           ...invoiceData,
           id: (savedId as string) || initialInvoice?.id || 'temp',
@@ -225,8 +228,22 @@ export default function InvoiceEditorModal({
     }
   };
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+    <div 
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto"
+    >
       <div className="bg-white dark:bg-zinc-900 w-full max-w-4xl rounded-3xl shadow-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden my-auto max-h-[95vh] flex flex-col">
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-800/40">
@@ -299,6 +316,7 @@ export default function InvoiceEditorModal({
               >
                 <option value="draft">Draft</option>
                 <option value="sent">Sent</option>
+                <option value="completed">Completed</option>
                 <option value="paid">Paid</option>
                 <option value="overdue">Overdue</option>
               </select>
@@ -388,6 +406,28 @@ export default function InvoiceEditorModal({
               <h4 className="text-xs font-black uppercase tracking-wider text-zinc-800 dark:text-zinc-200">
                 Invoice Line Items ({items.length})
               </h4>
+              <button
+                type="button"
+                onClick={() => {
+                  const defaultMiles = 30;
+                  const defaultRate = 0.45;
+                  const newItem: QuoteItem = {
+                    id: `mileage_${Date.now()}`,
+                    description: `Van Travel / Mileage (${defaultMiles} miles @ £${defaultRate.toFixed(2)}/mi)`,
+                    type: 'other',
+                    quantity: defaultMiles,
+                    unit: 'miles',
+                    unitPrice: defaultRate,
+                    total: Number((defaultMiles * defaultRate).toFixed(2))
+                  };
+                  setItems(prev => [...prev, newItem]);
+                }}
+                className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 rounded-lg text-xs font-bold flex items-center gap-1 shadow-sm active:scale-95 transition-all"
+                title="Add van travel / mileage charge to invoice"
+              >
+                <Truck className="w-3 h-3" />
+                <span>+ Add Mileage</span>
+              </button>
             </div>
 
             {/* Existing Items Table */}
@@ -560,6 +600,12 @@ export default function InvoiceEditorModal({
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Financial Notice */}
+        <div className="px-6 py-2 bg-amber-500/10 border-t border-amber-500/20 flex items-center gap-2 text-[11px] text-amber-800 dark:text-amber-300 shrink-0">
+          <ShieldAlert className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
+          <span>AI assistant tool. Verify all pricing, rates, and VAT calculations before sending invoice.</span>
         </div>
 
         {/* Footer Buttons */}

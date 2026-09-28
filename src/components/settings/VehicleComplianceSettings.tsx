@@ -22,6 +22,7 @@ import { useToast } from '../../contexts/ToastContext';
 import { doc, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import ConfirmModal from '../common/ConfirmModal';
+import MileageLogModal from '../expenses/MileageLogModal';
 
 interface VehicleComplianceSettingsProps {
   tradeUserId: string;
@@ -37,6 +38,7 @@ export default function VehicleComplianceSettings({
   const { showToast } = useToast();
   const [vehicles, setVehicles] = useState<Vehicle[]>(initialVehicles);
   const [saving, setSaving] = useState(false);
+  const [isMileageLogOpen, setIsMileageLogOpen] = useState(false);
   const [expandedVehicleId, setExpandedVehicleId] = useState<string | null>(
     initialVehicles.length > 0 ? initialVehicles[0].id : null
   );
@@ -232,6 +234,13 @@ export default function VehicleComplianceSettings({
           <span>Vehicle & Transport Fleet Compliance</span>
         </h4>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsMileageLogOpen(true)}
+            className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
+          >
+            <Truck className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+            <span>Mileage Log</span>
+          </button>
           <button
             onClick={() => setIsAddingVehicle(true)}
             className="px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all"
@@ -566,6 +575,13 @@ export default function VehicleComplianceSettings({
         variant="danger"
         onConfirm={() => handleDeleteVehicle(deleteConfirm.vehicleId)}
         onClose={() => setDeleteConfirm({ isOpen: false, vehicleId: '', vehicleName: '' })}
+      />
+
+      <MileageLogModal
+        isOpen={isMileageLogOpen}
+        onClose={() => setIsMileageLogOpen(false)}
+        tradeUserId={tradeUserId}
+        vehicles={vehicles}
       />
     </div>
   );

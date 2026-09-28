@@ -13,7 +13,9 @@ import {
   MapPin, 
   FileText,
   CreditCard,
-  Loader2
+  Loader2,
+  Truck,
+  ShieldAlert
 } from 'lucide-react';
 import { Quote, QuoteItem, BusinessDetails } from '../../types/quote';
 import { formatCurrency } from '../../services/quotePdfService';
@@ -154,6 +156,21 @@ export default function QuoteEditorModal({
     setItems([...items, newItem]);
   };
 
+  const handleAddMileageItem = () => {
+    const defaultMiles = 30;
+    const defaultRate = 0.45;
+    const newItem: QuoteItem = {
+      id: `mileage_${Date.now()}`,
+      description: `Van Travel / Mileage (${defaultMiles} miles @ £${defaultRate.toFixed(2)}/mi)`,
+      type: 'other',
+      quantity: defaultMiles,
+      unit: 'miles',
+      unitPrice: defaultRate,
+      total: Number((defaultMiles * defaultRate).toFixed(2))
+    };
+    setItems([...items, newItem]);
+  };
+
   const handleUpdateLabour = (id: string, daysVal: number, hoursVal: number, rateVal?: number) => {
     setItems(items.map(item => {
       if (item.id !== id) return item;
@@ -223,7 +240,8 @@ export default function QuoteEditorModal({
       vatAmount,
       grandTotal,
       paymentTerms,
-      notes
+      notes,
+      ...(initialQuote?.isQuickQuote ? { isQuickQuote: true } : {})
     };
   };
 
@@ -272,10 +290,22 @@ export default function QuoteEditorModal({
     }
   };
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-zinc-950/70 backdrop-blur-sm overflow-y-auto">
+    <div 
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-zinc-950/70 backdrop-blur-sm overflow-y-auto"
+    >
       <div className="relative w-full max-w-4xl bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
         {/* Header Bar */}
         <div className="px-6 py-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between shrink-0 bg-zinc-50/50 dark:bg-zinc-800/30">
@@ -284,9 +314,16 @@ export default function QuoteEditorModal({
               <Calculator className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base sm:text-lg font-bold text-zinc-900 dark:text-white">
-                {initialQuote?.id ? `Edit Quote ${quoteNumber}` : `New Quote (${quoteNumber})`}
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base sm:text-lg font-bold text-zinc-900 dark:text-white">
+                  {initialQuote?.id ? `Edit Quote ${quoteNumber}` : `New Quote (${quoteNumber})`}
+                </h2>
+                {initialQuote?.isQuickQuote && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3" /> Quick Quote
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-zinc-500 dark:text-zinc-400">
                 Itemise labour, materials, and consumables before sharing with your customer.
               </p>
@@ -443,6 +480,14 @@ export default function QuoteEditorModal({
                   className="px-3 py-1.5 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 hover:bg-blue-100 rounded-xl text-xs font-bold flex items-center gap-1 border border-blue-200 dark:border-blue-800 transition-all"
                 >
                   <Package className="w-3 h-3" /> + Add Material / Consumable
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAddMileageItem}
+                  className="px-3 py-1.5 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 hover:bg-amber-100 rounded-xl text-xs font-bold flex items-center gap-1 border border-amber-200 dark:border-amber-800 transition-all"
+                  title="Add van travel / mileage charge to quote"
+                >
+                  <Truck className="w-3 h-3" /> + Add Mileage
                 </button>
               </div>
             </div>
@@ -679,6 +724,12 @@ export default function QuoteEditorModal({
               />
             </div>
           </div>
+        </div>
+
+        {/* Financial Notice */}
+        <div className="px-6 py-2 bg-amber-500/10 border-t border-amber-500/20 flex items-center gap-2 text-[11px] text-amber-800 dark:text-amber-300 shrink-0">
+          <ShieldAlert className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
+          <span>AI assistant tool. Verify all pricing, rates, and VAT calculations before sharing quote.</span>
         </div>
 
         {/* Modal Bottom Controls */}

@@ -65,12 +65,12 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
-// SW Version 1.0.8: Force immediate takeover and purge old caches
+// SW Version 1.0.11: Force immediate takeover and purge old caches
 self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-const CACHE_NAME = 'tribe-cache-v4';
+const CACHE_NAME = 'tribe-cache-v7';
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(

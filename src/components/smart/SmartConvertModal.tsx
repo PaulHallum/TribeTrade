@@ -12,10 +12,12 @@ import {
   Calendar,
   Share2,
   Trash2,
-  Copy
+  Copy,
+  Warehouse
 } from 'lucide-react';
 import { shareToWhatsApp, shareViaWebShare, formatSmartConvertEventText, copyToClipboard } from '../../lib/shareUtils';
 import { processSmartConvert } from '../../services/smartCaptureService';
+import { addOrUpdateShedStock } from '../../services/shedService';
 import { weatherService } from '../../services/weatherService';
 import { db } from '../../lib/firebase';
 import { collection, addDoc, doc, updateDoc, query, where, getDocs } from 'firebase/firestore';
@@ -92,6 +94,32 @@ export default function SmartConvertModal({ onClose, content, originalId, origin
     if (!result || !result.actions) return;
     const updatedActions = result.actions.filter((_, i) => i !== index);
     setResult({ ...result, actions: updatedActions });
+  };
+
+  const handleToggleShedItemExcluded = (actionIndex: number, itemIndex: number) => {
+    if (!result?.actions) return;
+    const updated = [...result.actions];
+    const items = [...(updated[actionIndex].data?.items || [])];
+    if (items[itemIndex]) {
+      items[itemIndex] = {
+        ...items[itemIndex],
+        excluded: !items[itemIndex].excluded
+      };
+      updated[actionIndex].data.items = items;
+      setResult({ ...result, actions: updated });
+    }
+  };
+
+  const handleRemoveShedSubItem = (actionIndex: number, itemIndex: number) => {
+    if (!result?.actions) return;
+    const updated = [...result.actions];
+    const items = (updated[actionIndex].data?.items || []).filter((_: any, i: number) => i !== itemIndex);
+    if (items.length === 0) {
+      handleRemoveAction(actionIndex);
+    } else {
+      updated[actionIndex].data.items = items;
+      setResult({ ...result, actions: updated });
+    }
   };
 
   useEffect(() => {
@@ -353,6 +381,29 @@ export default function SmartConvertModal({ onClose, content, originalId, origin
             authorId: user.uid,
             createdAt: new Date().toISOString()
           });
+        } else if (action === 'ADD_TO_SHED_STOCK') {
+          const rawItems = Array.isArray(data.items) && data.items.length > 0
+            ? data.items
+            : [{ name: data.name || data.title || result.title, quantity: data.quantity || 1, category: data.category || 'Materials', excluded: data.excluded || false }];
+          const shedItems = rawItems
+            .filter((i: any) => !i.excluded)
+            .map((i: any) => ({
+              name: i.name,
+              quantity: i.quantity || 1,
+              category: i.category || 'Materials',
+              unit: i.unit || 'units',
+              costPrice: i.unitPrice || i.costPrice || 0,
+              supplier: data.merchant || i.supplier || 'Trade Merchant'
+            }));
+
+          if (shedItems.length > 0) {
+            const res = await addOrUpdateShedStock(tradeUserId, shedItems);
+            const excludedCount = rawItems.length - shedItems.length;
+            const extraMsg = excludedCount > 0 ? ` (${excludedCount} personal item${excludedCount > 1 ? 's' : ''} excluded)` : '';
+            showToast(`Added ${res.addedCount + res.updatedCount} item(s) to The Shed stock!${extraMsg}`, 'success');
+          } else {
+            showToast('All items were excluded as personal use (none added to The Shed).', 'info');
+          }
         }
       }
       onClose();
@@ -568,9 +619,115 @@ export default function SmartConvertModal({ onClose, content, originalId, origin
                             } else if (act.action === 'CREATE_SHOPPING_ITEM') {
                               icon = '🛒';
                               typeLabel = 'Shopping Item';
+                            } else if (act.action === 'ADD_TO_SHED_STOCK') {
+                              icon = '🏚️';
+                              typeLabel = 'The Shed Inventory';
+                              if (act.data?.items && act.data.items.length > 0) {
+                                title = `${act.data.merchant ? act.data.merchant + ': ' : ''}${act.data.items.map((i: any) => `${i.quantity || 1}x ${i.name}`).join(', ')}`;
+                              }
                             } else if (act.action === 'CREATE_RECIPE') {
                               icon = '🍳';
                               typeLabel = 'Recipe';
+                            }
+
+                            if (act.action === 'ADD_TO_SHED_STOCK') {
+                              return (
+                                <li key={index} className="flex flex-col gap-2.5 p-3 rounded-2xl bg-white dark:bg-zinc-850/80 border border-emerald-500/30 text-xs shadow-sm">
+                                  <div className="flex items-start justify-between gap-2 border-b border-zinc-150 dark:border-zinc-700/60 pb-2">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-7 h-7 rounded-xl bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+                                        <Warehouse className="w-4 h-4" />
+                                      </div>
+                                      <div>
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <span className="font-black text-xs text-zinc-900 dark:text-white">
+                                            The Shed Stock: {act.data?.merchant || 'Trade Order'}
+                                          </span>
+                                          {act.data?.orderNumber && (
+                                            <span className="text-[10px] font-mono text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">
+                                              #{act.data.orderNumber}
+                                            </span>
+                                          )}
+                                        </div>
+                                        <p className="text-[10px] text-zinc-500 dark:text-zinc-400">
+                                          All items update The Shed by default. Untick any item for personal use.
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <button
+                                      onClick={() => handleRemoveAction(index)}
+                                      className="p-1 text-zinc-400 hover:text-red-500 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors shrink-0"
+                                      title="Remove stock order"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+
+                                  <div className="space-y-1.5 pt-1">
+                                    {(act.data?.items || []).map((subItem: any, subIdx: number) => {
+                                      const isExcluded = !!subItem.excluded;
+                                      return (
+                                        <div
+                                          key={subIdx}
+                                          className={`flex items-center justify-between gap-2 p-2 rounded-xl border transition-all ${
+                                            isExcluded
+                                              ? 'bg-amber-50/40 dark:bg-amber-950/20 border-amber-200/50 text-zinc-400 dark:text-zinc-500'
+                                              : 'bg-zinc-50 dark:bg-zinc-800/60 border-zinc-200/60 dark:border-zinc-700/60 text-zinc-800 dark:text-zinc-200'
+                                          }`}
+                                        >
+                                          <label className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer select-none">
+                                            <input
+                                              type="checkbox"
+                                              checked={!isExcluded}
+                                              onChange={() => handleToggleShedItemExcluded(index, subIdx)}
+                                              className="w-4 h-4 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer shrink-0"
+                                            />
+                                            <div className="min-w-0 flex-1">
+                                              <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span className={`font-semibold ${isExcluded ? 'line-through text-zinc-400 dark:text-zinc-500' : 'text-zinc-900 dark:text-white'}`}>
+                                                  {subItem.name}
+                                                </span>
+                                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-zinc-200/70 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300">
+                                                  {subItem.quantity || 1} {subItem.unit || 'units'}
+                                                </span>
+                                                {subItem.category && (
+                                                  <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200/40">
+                                                    {subItem.category}
+                                                  </span>
+                                                )}
+                                                {typeof subItem.unitPrice === 'number' && subItem.unitPrice > 0 && (
+                                                  <span className="text-[10px] font-mono text-zinc-500">
+                                                    £{Number(subItem.unitPrice).toFixed(2)}
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <div className="text-[9px] mt-0.5">
+                                                {isExcluded ? (
+                                                  <span className="font-bold text-amber-600 dark:text-amber-400">
+                                                    👤 Personal Use (Excluded from The Shed)
+                                                  </span>
+                                                ) : (
+                                                  <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                                                    📦 Will update The Shed stock
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </div>
+                                          </label>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleRemoveShedSubItem(index, subIdx)}
+                                            className="p-1 text-zinc-400 hover:text-red-500 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors shrink-0"
+                                            title="Remove item"
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                          </button>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </li>
+                              );
                             }
 
                             return (

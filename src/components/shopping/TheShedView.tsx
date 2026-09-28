@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { 
   Warehouse, 
   Plus, 
@@ -9,7 +9,9 @@ import {
   Package, 
   AlertTriangle,
   Layers,
-  ArrowRight
+  ArrowRight,
+  Briefcase,
+  Loader2
 } from 'lucide-react';
 import { db } from '../../lib/firebase';
 import { 
@@ -25,6 +27,8 @@ import { useAuth } from '../../App';
 import { useToast } from '../../contexts/ToastContext';
 import { detectCategory } from '../../lib/shoppingUtils';
 import ConfirmModal from '../common/ConfirmModal';
+import AssignStockModal from './AssignStockModal';
+import { subscribeShedAllocations, ShedAllocationRecord } from '../../services/shedService';
 
 export interface ShedStockItem {
   id: string;
@@ -44,11 +48,15 @@ export default function TheShedView({ onSwitchToPickList }: TheShedViewProps) {
   const { tradeUserId } = useAuth();
   const { showToast } = useToast();
 
+  const [activeTab, setActiveTab] = useState<'stock' | 'allocations'>('stock');
   const [stock, setStock] = useState<ShedStockItem[]>([]);
+  const [allocations, setAllocations] = useState<ShedAllocationRecord[]>([]);
+  const [loadingAllocations, setLoadingAllocations] = useState(false);
   const [name, setName] = useState('');
   const [quantity, setQuantity] = useState<number | string>(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [assignModalItem, setAssignModalItem] = useState<ShedStockItem | null>(null);
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean;
     title: string;
@@ -66,7 +74,7 @@ export default function TheShedView({ onSwitchToPickList }: TheShedViewProps) {
   useEffect(() => {
     if (!tradeUserId) return;
     const shedRef = collection(db, 'trade_users', tradeUserId, 'shedInventory');
-    const unsubscribe = onSnapshot(shedRef, (snapshot) => {
+    const unsubscribeStock = onSnapshot(shedRef, (snapshot) => {
       const list = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
@@ -76,7 +84,15 @@ export default function TheShedView({ onSwitchToPickList }: TheShedViewProps) {
       setStock(list);
     });
 
-    return () => unsubscribe();
+    const unsubscribeAllocations = subscribeShedAllocations(tradeUserId, (records) => {
+      setAllocations(records);
+      setLoadingAllocations(false);
+    });
+
+    return () => {
+      unsubscribeStock();
+      unsubscribeAllocations();
+    };
   }, [tradeUserId]);
 
   const handleAddStock = async (e?: React.FormEvent) => {
@@ -182,6 +198,35 @@ export default function TheShedView({ onSwitchToPickList }: TheShedViewProps) {
 
   const categories = Array.from(new Set(stock.map(i => i.category || 'General Materials')));
 
+  // Map of reserved quantities per stock item from job allocations
+  const reservedMap = useMemo(() => {
+    const map: { [stockItemId: string]: number } = {};
+    for (const a of allocations) {
+      if (a.stockItemId) {
+        map[a.stockItemId] = Number(((map[a.stockItemId] || 0) + (Number(a.quantity) || 0)).toFixed(2));
+      }
+    }
+    return map;
+  }, [allocations]);
+
+  // Group allocations by target job/invoice
+  const allocationsByJob = useMemo(() => {
+    const groups: { [key: string]: { jobTitle: string; customerName?: string; targetType: string; items: ShedAllocationRecord[] } } = {};
+    for (const alloc of allocations) {
+      const key = alloc.targetId || alloc.jobTitle;
+      if (!groups[key]) {
+        groups[key] = {
+          jobTitle: alloc.jobTitle,
+          customerName: alloc.customerName,
+          targetType: alloc.targetType,
+          items: []
+        };
+      }
+      groups[key].items.push(alloc);
+    }
+    return Object.values(groups);
+  }, [allocations]);
+
   const filteredStock = stock.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (item.category && item.category.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -218,26 +263,112 @@ export default function TheShedView({ onSwitchToPickList }: TheShedViewProps) {
         </div>
       </div>
 
-      {/* Low Stock Reorder Banner */}
-      {lowOrOutItems.length > 0 && (
-        <div className="bg-amber-500/10 border border-amber-500/20 p-3.5 rounded-2xl flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-            <p className="text-xs font-semibold text-amber-900 dark:text-amber-200 truncate">
-              {lowOrOutItems.length} item{lowOrOutItems.length > 1 ? 's are' : ' is'} low or out of stock in The Shed
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={handleAddAllLowStockToShoppingList}
-            className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white rounded-xl text-xs font-bold shrink-0 flex items-center gap-1.5 shadow-sm transition-all"
-            title="Add all low stock items to shopping list"
-          >
-            <ShoppingCart className="w-3.5 h-3.5" />
-            <span>Buy All Low Stock</span>
-          </button>
+      {/* View Switcher: Stock Inventory vs Job Allocations */}
+      <div className="flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-2">
+        <button
+          onClick={() => setActiveTab('stock')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'stock'
+              ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-sm'
+              : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+          }`}
+        >
+          <Warehouse className="w-3.5 h-3.5" />
+          <span>Shed Stock ({totalItems})</span>
+        </button>
+        <button
+          onClick={() => {
+            setActiveTab('allocations');
+            fetchAllocations();
+          }}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'allocations'
+              ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-sm'
+              : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+          }`}
+        >
+          <Briefcase className="w-3.5 h-3.5" />
+          <span>Allocated to Jobs {allocations.length > 0 && `(${allocations.length})`}</span>
+        </button>
+      </div>
+
+      {activeTab === 'allocations' ? (
+        <div className="space-y-3">
+          {loadingAllocations ? (
+            <div className="bg-white dark:bg-zinc-900 rounded-3xl p-10 text-center border border-zinc-200 dark:border-zinc-800">
+              <Loader2 className="w-6 h-6 animate-spin text-zinc-400 mx-auto" />
+              <p className="text-xs text-zinc-500 mt-2">Loading job allocations...</p>
+            </div>
+          ) : allocations.length === 0 ? (
+            <div className="bg-white dark:bg-zinc-900 rounded-3xl p-10 text-center border border-zinc-200 dark:border-zinc-800 space-y-2">
+              <Briefcase className="w-10 h-10 text-zinc-300 dark:text-zinc-700 mx-auto" />
+              <h4 className="text-sm font-bold text-zinc-700 dark:text-zinc-300">No stock allocated to jobs yet</h4>
+              <p className="text-xs text-zinc-400 max-w-sm mx-auto">
+                When you use materials on client jobs, quotes, or invoices, click "Assign to Job" on any stock item to deduct holding stock and log the allocation.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {allocations.map((alloc) => (
+                <div
+                  key={alloc.id}
+                  className="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300">
+                        {alloc.targetType === 'quote' ? 'Quote' : alloc.targetType === 'invoice' ? 'Invoice' : 'Custom Job'}
+                      </span>
+                      <h4 className="text-sm font-bold text-zinc-900 dark:text-white truncate">
+                        {alloc.jobTitle}
+                      </h4>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                      <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                        {alloc.quantity} {alloc.unit || 'units'} of {alloc.stockItemName}
+                      </span>
+                      {alloc.customerName && <span>• Client: {alloc.customerName}</span>}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-zinc-100 dark:border-zinc-800">
+                    <div className="text-right">
+                      <span className="text-[10px] font-bold text-zinc-400 block">Charged</span>
+                      <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">
+                        {alloc.totalCharged > 0 ? `£${alloc.totalCharged.toFixed(2)}` : 'Included in Job'}
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-zinc-400 whitespace-nowrap">
+                      {new Date(alloc.allocatedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      )}
+      ) : (
+        <>
+          {/* Low Stock Reorder Banner */}
+          {lowOrOutItems.length > 0 && (
+            <div className="bg-amber-500/10 border border-amber-500/20 p-3.5 rounded-2xl flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                <p className="text-xs font-semibold text-amber-900 dark:text-amber-200 truncate">
+                  {lowOrOutItems.length} item{lowOrOutItems.length > 1 ? 's are' : ' is'} low or out of stock in The Shed
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleAddAllLowStockToShoppingList}
+                className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white rounded-xl text-xs font-bold shrink-0 flex items-center gap-1.5 shadow-sm transition-all"
+                title="Add all low stock items to shopping list"
+              >
+                <ShoppingCart className="w-3.5 h-3.5" />
+                <span>Buy All Low Stock</span>
+              </button>
+            </div>
+          )}
 
       {/* Add Stock Form */}
       <form onSubmit={handleAddStock} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-3xl shadow-sm space-y-3">
@@ -369,6 +500,11 @@ export default function TheShedView({ onSwitchToPickList }: TheShedViewProps) {
                             {item.category}
                           </span>
                         )}
+                        {reservedMap[item.id] > 0 && (
+                          <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800/40 px-1.5 py-0.5 rounded">
+                            {reservedMap[item.id]} reserved
+                          </span>
+                        )}
                         {isOut && (
                           <span className="text-[10px] font-bold text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/40 px-1.5 py-0.5 rounded">
                             Out of Stock
@@ -425,18 +561,30 @@ export default function TheShedView({ onSwitchToPickList }: TheShedViewProps) {
                       </button>
                     </div>
 
-                    <button
-                      onClick={() => handleSendToPickList(item)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl transition-all active:scale-95 ${
-                        isLow || isOut
-                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm'
-                          : 'text-zinc-600 dark:text-zinc-300 hover:text-emerald-600 dark:hover:text-emerald-400 bg-zinc-100 dark:bg-zinc-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/30'
-                      }`}
-                      title="Add to shopping list in one click"
-                    >
-                      <ShoppingCart className="w-3.5 h-3.5" />
-                      <span>Buy More</span>
-                    </button>
+                    <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                      <button
+                        onClick={() => setAssignModalItem(item)}
+                        disabled={qty <= 0}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl transition-all active:scale-95 text-zinc-700 dark:text-zinc-200 hover:text-blue-600 dark:hover:text-blue-400 bg-zinc-100 dark:bg-zinc-800 hover:bg-blue-50 dark:hover:bg-blue-950/30 disabled:opacity-40 disabled:cursor-not-allowed"
+                        title="Assign stock to a Quote, Invoice, or Job"
+                      >
+                        <Briefcase className="w-3.5 h-3.5" />
+                        <span>Assign to Job</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleSendToPickList(item)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl transition-all active:scale-95 ${
+                          isLow || isOut
+                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm'
+                            : 'text-zinc-600 dark:text-zinc-300 hover:text-emerald-600 dark:hover:text-emerald-400 bg-zinc-100 dark:bg-zinc-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/30'
+                        }`}
+                        title="Add to shopping list in one click"
+                      >
+                        <ShoppingCart className="w-3.5 h-3.5" />
+                        <span>Buy More</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -444,6 +592,92 @@ export default function TheShedView({ onSwitchToPickList }: TheShedViewProps) {
           </div>
         )}
       </div>
+
+      {/* Reserved / Allocated Stock Grouped by Job */}
+      <div className="pt-6 border-t border-zinc-200 dark:border-zinc-800 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-black uppercase tracking-wider text-zinc-900 dark:text-white flex items-center gap-2">
+              <Briefcase className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              Reserved & Allocated Stock by Job
+            </h3>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+              Stock items dedicated or reserved for active trade jobs and invoices
+            </p>
+          </div>
+          {allocations.length > 0 && (
+            <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+              {allocations.length} allocated item{allocations.length === 1 ? '' : 's'}
+            </span>
+          )}
+        </div>
+
+        {allocationsByJob.length === 0 ? (
+          <div className="p-6 bg-zinc-50 dark:bg-zinc-800/40 rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-800 text-center">
+            <p className="text-xs text-zinc-400">
+              No stock is currently reserved for any jobs. Click "Assign to Job" on any stock item above to allocate materials to a trade invoice.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {allocationsByJob.map((jobGroup, idx) => (
+              <div
+                key={idx}
+                className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 shadow-sm space-y-3"
+              >
+                <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-2.5">
+                  <div className="min-w-0">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 mr-2">
+                      {jobGroup.targetType === 'invoice' ? 'Invoice' : 'Direct Job'}
+                    </span>
+                    <h4 className="text-xs font-bold text-zinc-900 dark:text-white truncate inline">
+                      {jobGroup.jobTitle}
+                    </h4>
+                    {jobGroup.customerName && (
+                      <p className="text-[11px] text-zinc-500 mt-0.5">
+                        Client: {jobGroup.customerName}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  {jobGroup.items.map((it, itemIdx) => (
+                    <div
+                      key={it.id || itemIdx}
+                      className="flex items-center justify-between text-xs py-1.5 px-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-100 dark:border-zinc-800"
+                    >
+                      <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                        {it.stockItemName}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-black text-blue-600 dark:text-blue-400">
+                          {it.quantity} {it.unit || 'units'} reserved
+                        </span>
+                        {it.totalCharged > 0 && (
+                          <span className="text-[10px] text-zinc-400">
+                            (£{it.totalCharged.toFixed(2)})
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      </>
+      )}
+
+      {/* Assign Stock to Job Modal */}
+      <AssignStockModal
+        isOpen={Boolean(assignModalItem)}
+        item={assignModalItem}
+        tradeUserId={tradeUserId || ''}
+        onClose={() => setAssignModalItem(null)}
+      />
 
       {/* Confirmation Modal */}
       <ConfirmModal

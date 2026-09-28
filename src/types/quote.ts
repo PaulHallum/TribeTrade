@@ -1,4 +1,6 @@
-export type QuoteStatus = 'draft' | 'pending' | 'accepted' | 'declined';
+import { Vehicle } from './vehicle';
+
+export type QuoteStatus = 'draft' | 'sent' | 'pending' | 'accepted' | 'declined';
 
 export type QuoteItemType = 'labour' | 'material' | 'hire' | 'other';
 
@@ -36,6 +38,7 @@ export interface BusinessDetails {
   defaultQuoteTerms?: string; // e.g. "Quote valid for 30 days. Materials subject to supplier price changes."
   highestQuoteNumber?: number; // Monotonically increasing sequence tracker
   highestInvoiceNumber?: number; // Monotonically increasing sequence tracker
+  vehicles?: Vehicle[];
 }
 
 export interface Quote {
@@ -72,6 +75,7 @@ export interface Quote {
   notes?: string;
   
   // Metadata & Conversion
+  isQuickQuote?: boolean;
   invoiceId?: string;
   calendarEventId?: string;
   authorId?: string;
@@ -79,7 +83,7 @@ export interface Quote {
   updatedAt?: string;
 }
 
-export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue';
+export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'completed' | 'overdue';
 
 export interface Invoice {
   id: string;

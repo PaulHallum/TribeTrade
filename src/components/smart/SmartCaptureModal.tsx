@@ -13,10 +13,13 @@ import {
   CheckSquare,
   Sparkles,
   ChefHat,
-  Clock
+  Clock,
+  Calculator,
+  Warehouse
 } from 'lucide-react';
 import { useSettings } from '../../contexts/SettingsContext';
 import { processSmartCapture, SmartConversionResult } from '../../services/smartCaptureService';
+import { addOrUpdateShedStock } from '../../services/shedService';
 import { db } from '../../lib/firebase';
 import { collection, addDoc, updateDoc, getCountFromServer, doc, getDoc } from 'firebase/firestore';
 import { syncToGoogleCalendar } from '../../services/googleCalendar';
@@ -136,6 +139,10 @@ export default function SmartCaptureModal({
       const reader = new FileReader();
       reader.onloadend = () => {
         const rawBase64 = (reader.result as string).split(',')[1];
+        if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+          handleProcess({ imageBase64: rawBase64, mimeType: 'application/pdf' });
+          return;
+        }
         downscaleAndCompressImage(rawBase64, file.type)
           .then((compressedBase64) => {
             handleProcess({ imageBase64: compressedBase64, mimeType: 'image/jpeg' });
@@ -143,7 +150,7 @@ export default function SmartCaptureModal({
           .catch((err) => {
             logger.error('Failed to downscale uploaded image', err);
             // fallback
-            handleProcess({ imageBase64: rawBase64, mimeType: file.type });
+            handleProcess({ imageBase64: rawBase64, mimeType: file.type || 'image/jpeg' });
           });
       };
       reader.readAsDataURL(file);
@@ -190,12 +197,65 @@ export default function SmartCaptureModal({
     setResult({ ...result, actions: updatedActions });
   };
 
+  const handleToggleShedItemExcluded = (actionIndex: number, itemIndex: number) => {
+    if (!result || !result.actions) return;
+    const newActions = [...result.actions];
+    const items = [...(newActions[actionIndex].data?.items || [])];
+    if (items[itemIndex]) {
+      items[itemIndex] = {
+        ...items[itemIndex],
+        excluded: !items[itemIndex].excluded
+      };
+      newActions[actionIndex].data.items = items;
+      setResult({ ...result, actions: newActions });
+    }
+  };
+
+  const handleRemoveShedSubItem = (actionIndex: number, itemIndex: number) => {
+    if (!result || !result.actions) return;
+    const newActions = [...result.actions];
+    const items = (newActions[actionIndex].data?.items || []).filter((_: any, i: number) => i !== itemIndex);
+    if (items.length === 0) {
+      handleRemoveAction(actionIndex);
+    } else {
+      newActions[actionIndex].data.items = items;
+      setResult({ ...result, actions: newActions });
+    }
+  };
+
   const handleSave = async () => {
     if (!result || !tradeUserId || !user) return;
     setSaving(true);
     try {
       for (const item of result.actions) {
-        const collectionName = item.action === 'CREATE_CALENDAR_EVENT' ? 'calendarEvents' : 
+        if (item.action === 'ADD_TO_SHED_STOCK') {
+          const rawItems = Array.isArray(item.data.items) && item.data.items.length > 0
+            ? item.data.items
+            : [{ name: item.data.name || item.data.title || 'Materials', quantity: item.data.quantity || 1, category: item.data.category || 'Materials', excluded: item.data.excluded || false }];
+          const shedItems = rawItems
+            .filter((i: any) => !i.excluded)
+            .map((i: any) => ({
+              name: i.name,
+              quantity: i.quantity || 1,
+              category: i.category || 'Materials',
+              unit: i.unit || 'units',
+              costPrice: i.unitPrice || i.costPrice || 0,
+              supplier: item.data.merchant || i.supplier || 'Trade Merchant'
+            }));
+
+          if (shedItems.length > 0) {
+            const res = await addOrUpdateShedStock(tradeUserId, shedItems);
+            const excludedCount = rawItems.length - shedItems.length;
+            const extraMsg = excludedCount > 0 ? ` (${excludedCount} personal item${excludedCount > 1 ? 's' : ''} excluded)` : '';
+            showToast(`Added ${res.addedCount + res.updatedCount} item(s) to The Shed inventory!${extraMsg}`, 'success');
+          } else {
+            showToast('All items were marked for personal use (none added to The Shed).', 'info');
+          }
+          continue;
+        }
+
+        const collectionName = item.action === 'CREATE_QUOTE' ? 'quotes' :
+                              item.action === 'CREATE_CALENDAR_EVENT' ? 'calendarEvents' : 
                               item.action === 'CREATE_TASK' ? 'tasks' : 
                               item.action === 'CREATE_SHOPPING_ITEM' ? 'shoppingList' : 
                               item.action === 'CREATE_RECIPE' ? 'recipes' : 'notes';
@@ -271,8 +331,42 @@ export default function SmartCaptureModal({
           }
         } else if (item.action === 'CREATE_SHOPPING_ITEM') {
           dataToSave.name = item.data.name || item.data.title;
-          dataToSave.category = item.data.category || 'Essentials';
+          dataToSave.category = item.data.category || 'Materials / The Shed';
           dataToSave.checked = false;
+        } else if (item.action === 'CREATE_QUOTE') {
+          dataToSave.quoteNumber = `Q-${Math.floor(1000 + Math.random() * 9000)}`;
+          dataToSave.customerName = item.data.customerName || item.data.title || 'Client Quotation';
+          dataToSave.customerPhone = item.data.customerPhone || '';
+          dataToSave.customerEmail = item.data.customerEmail || '';
+          dataToSave.customerAddress = item.data.customerAddress || item.data.location || '';
+          dataToSave.jobTitle = item.data.jobTitle || item.data.title || 'Trade Works';
+          dataToSave.jobDescription = item.data.description || item.data.notes || '';
+          dataToSave.status = 'draft';
+          dataToSave.dateIssued = new Date().toISOString().split('T')[0];
+          const validDate = new Date();
+          validDate.setDate(validDate.getDate() + 30);
+          dataToSave.validUntil = validDate.toISOString().split('T')[0];
+          const estimatedCost = typeof item.data.estimatedTotal === 'number' 
+            ? item.data.estimatedTotal 
+            : typeof item.data.amount === 'number' 
+            ? item.data.amount 
+            : 0;
+          dataToSave.items = item.data.items || [
+            {
+              id: `item_${Date.now()}`,
+              description: item.data.description || item.data.title || 'Quoted work items from note scribble',
+              type: 'labour',
+              quantity: 1,
+              unit: '1 day',
+              unitPrice: estimatedCost,
+              total: estimatedCost
+            }
+          ];
+          dataToSave.subtotalLabour = estimatedCost;
+          dataToSave.subtotalMaterials = 0;
+          dataToSave.netTotal = estimatedCost;
+          dataToSave.vatAmount = 0;
+          dataToSave.grandTotal = estimatedCost;
         } else if (item.action === 'CREATE_NOTE') {
           dataToSave.title = item.data.title || 'Extracted Note';
           dataToSave.content = item.data.content || item.data.description || 'No content';
@@ -378,8 +472,8 @@ export default function SmartCaptureModal({
                   <Upload className="w-5 h-5 sm:w-6 sm:h-6" />
                 </div>
                 <div className="text-left">
-                  <p className="font-bold text-zinc-900 dark:text-white text-sm sm:text-base">Upload File</p>
-                  <p className="text-xs sm:text-sm text-zinc-500">Pick an image from your device.</p>
+                  <p className="font-bold text-zinc-900 dark:text-white text-sm sm:text-base">Upload File or PDF</p>
+                  <p className="text-xs sm:text-sm text-zinc-500">Pick a receipt photo or supplier PDF order.</p>
                 </div>
                 <input 
                   type="file" 
@@ -521,36 +615,122 @@ export default function SmartCaptureModal({
                       </button>
                       <div className="flex items-start gap-3">
                         <div className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-700 flex items-center justify-center shrink-0">
+                          {item.action === 'CREATE_QUOTE' && <Calculator className="w-4 h-4 text-emerald-600" />}
                           {item.action === 'CREATE_TASK' && <CheckSquare className="w-4 h-4 text-orange-500" />}
                           {item.action === 'CREATE_CALENDAR_EVENT' && <Calendar className="w-4 h-4 text-blue-500" />}
                           {item.action === 'CREATE_SHOPPING_ITEM' && <CheckSquare className="w-4 h-4 text-emerald-500" />}
+                          {item.action === 'ADD_TO_SHED_STOCK' && <Warehouse className="w-4 h-4 text-emerald-600" />}
                           {item.action === 'CREATE_NOTE' && <FileText className="w-4 h-4 text-purple-500" />}
                           {item.action === 'CREATE_RECIPE' && <ChefHat className="w-4 h-4 text-rose-500" />}
                         </div>
-                        <div className="min-w-0 flex-1 pr-7">
-                          <input 
-                            type="text"
-                            value={item.data.title || item.data.name || ''}
-                            onChange={(e) => {
-                              const newResult = { ...result };
-                              if (item.action === 'CREATE_SHOPPING_ITEM') newResult.actions[idx].data.name = e.target.value;
-                              else newResult.actions[idx].data.title = e.target.value;
-                              setResult(newResult);
-                            }}
-                            className="w-full bg-transparent border-none p-0 font-bold text-sm text-zinc-900 dark:text-white focus:ring-0"
-                          />
-                          <textarea 
-                            value={item.data.description || item.data.content || ''}
-                            onChange={(e) => {
-                              const newResult = { ...result };
-                              if (item.action === 'CREATE_NOTE') newResult.actions[idx].data.content = e.target.value;
-                              else newResult.actions[idx].data.description = e.target.value;
-                              setResult(newResult);
-                            }}
-                            placeholder="Add details..."
-                            className="w-full bg-transparent border-none p-0 text-xs text-zinc-500 focus:ring-0 resize-none h-8"
-                          />
-                        </div>
+                        {item.action === 'ADD_TO_SHED_STOCK' ? (
+                          <div className="min-w-0 flex-1 pr-6 space-y-3">
+                            <div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h4 className="font-bold text-sm text-zinc-900 dark:text-white">
+                                  The Shed Stock: {item.data.merchant || 'Trade Supplier Order'}
+                                </h4>
+                                {item.data.orderNumber && (
+                                  <span className="text-[10px] font-mono text-zinc-400 bg-zinc-100 dark:bg-zinc-700 px-1.5 py-0.5 rounded">
+                                    #{item.data.orderNumber}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                                All items update The Shed by default. Untick any item bought for personal use.
+                              </p>
+                            </div>
+
+                            <div className="space-y-1.5">
+                              {(item.data.items || []).map((subItem: any, subIdx: number) => {
+                                const isExcluded = !!subItem.excluded;
+                                return (
+                                  <div
+                                    key={subIdx}
+                                    className={`flex items-center justify-between gap-2 p-2 rounded-xl border transition-all text-xs ${
+                                      isExcluded
+                                        ? 'bg-amber-50/40 dark:bg-amber-950/20 border-amber-200/50 text-zinc-400 dark:text-zinc-500'
+                                        : 'bg-white/80 dark:bg-zinc-800/80 border-zinc-200/60 dark:border-zinc-700/60 text-zinc-800 dark:text-zinc-200'
+                                    }`}
+                                  >
+                                    <label className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer select-none">
+                                      <input
+                                        type="checkbox"
+                                        checked={!isExcluded}
+                                        onChange={() => handleToggleShedItemExcluded(idx, subIdx)}
+                                        className="w-4 h-4 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer shrink-0"
+                                      />
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                          <span className={`font-semibold ${isExcluded ? 'line-through text-zinc-400 dark:text-zinc-500' : 'text-zinc-900 dark:text-white'}`}>
+                                            {subItem.name}
+                                          </span>
+                                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-zinc-200/70 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300">
+                                            {subItem.quantity || 1} {subItem.unit || 'units'}
+                                          </span>
+                                          {subItem.category && (
+                                            <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200/40">
+                                              {subItem.category}
+                                            </span>
+                                          )}
+                                          {typeof subItem.unitPrice === 'number' && subItem.unitPrice > 0 && (
+                                            <span className="text-[10px] font-mono text-zinc-500">
+                                              £{Number(subItem.unitPrice).toFixed(2)}
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div className="text-[9px] mt-0.5">
+                                          {isExcluded ? (
+                                            <span className="font-bold text-amber-600 dark:text-amber-400">
+                                              👤 Personal Use (Excluded from The Shed)
+                                            </span>
+                                          ) : (
+                                            <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                                              📦 Will update The Shed stock
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </label>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveShedSubItem(idx, subIdx)}
+                                      className="p-1 text-zinc-400 hover:text-red-500 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors shrink-0"
+                                      title="Remove item"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="min-w-0 flex-1 pr-7">
+                            <input 
+                              type="text"
+                              value={item.data.title || item.data.name || ''}
+                              onChange={(e) => {
+                                const newResult = { ...result };
+                                if (item.action === 'CREATE_SHOPPING_ITEM') newResult.actions[idx].data.name = e.target.value;
+                                else newResult.actions[idx].data.title = e.target.value;
+                                setResult(newResult);
+                              }}
+                              className="w-full bg-transparent border-none p-0 font-bold text-sm text-zinc-900 dark:text-white focus:ring-0"
+                            />
+                            <textarea 
+                              value={item.data.description || item.data.content || ''}
+                              onChange={(e) => {
+                                const newResult = { ...result };
+                                if (item.action === 'CREATE_NOTE') newResult.actions[idx].data.content = e.target.value;
+                                else newResult.actions[idx].data.description = e.target.value;
+                                setResult(newResult);
+                              }}
+                              placeholder="Add details..."
+                              className="w-full bg-transparent border-none p-0 text-xs text-zinc-500 focus:ring-0 resize-none h-8"
+                            />
+                          </div>
+                        )}
                       </div>
 
                       {(item.action === 'CREATE_TASK' || item.action === 'CREATE_CALENDAR_EVENT') && (

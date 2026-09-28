@@ -48,6 +48,12 @@ export default function QuickAddModal({ onClose, initialDate, restrictToType, in
   const [endTime, setEndTime] = useState('13:00');
   const [hasUserChangedEndTime, setHasUserChangedEndTime] = useState(false);
 
+  useEffect(() => {
+    if (initialDate) {
+      setDate(formatToLocalDate(initialDate));
+    }
+  }, [initialDate]);
+
   // Quote-specific form states
   const [quoteCustomerName, setQuoteCustomerName] = useState('');
   const [quoteAmount, setQuoteAmount] = useState('');
@@ -239,13 +245,14 @@ export default function QuickAddModal({ onClose, initialDate, restrictToType, in
       } else if (type === 'quote') {
         const nextNum = generateNextQuoteNumber(existingQuotes);
         const amountNum = parseFloat(quoteAmount) || 0;
-        await saveQuote(tradeUserId, {
+        const quotePayload: any = {
           quoteNumber: nextNum,
           customerName: quoteCustomerName.trim() || 'Client',
-          jobTitle: title.trim(),
+          jobTitle: title.trim() || 'Trade Services',
           dateIssued: formatToLocalDate(new Date()),
           validUntil: quoteValidUntil || formatToLocalDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)),
           status: 'draft',
+          isQuickQuote: true,
           subtotalLabour: amountNum,
           subtotalMaterials: 0,
           netTotal: amountNum,
@@ -265,8 +272,25 @@ export default function QuickAddModal({ onClose, initialDate, restrictToType, in
               total: amountNum
             }
           ]
-        });
-        showToast(`Quote ${nextNum} draft created`, 'success');
+        };
+
+        const savedId = await saveQuote(tradeUserId, quotePayload);
+        const fullDraft: Quote = {
+          ...quotePayload,
+          id: savedId,
+          createdAt: new Date().toISOString()
+        };
+
+        showToast(`Opening full quote prompt for ${nextNum}...`, 'success');
+        onClose();
+
+        // Navigate to quotes and open the full QuoteEditorModal immediately
+        window.history.pushState({ view: 'quotes' }, '', '/quotes');
+        window.dispatchEvent(new PopStateEvent('popstate', { state: { view: 'quotes' } }));
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('tribe_open_quote_draft', { detail: { quote: fullDraft } }));
+        }, 200);
+        return;
       } else if (type === 'expense') {
         const grossAmount = parseFloat(expenseAmount) || 0;
         await saveTransaction(tradeUserId, {

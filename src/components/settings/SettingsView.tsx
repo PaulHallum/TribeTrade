@@ -38,7 +38,8 @@ import {
   Smartphone,
   Tablet,
   Laptop,
-  ChevronDown
+  ChevronDown,
+  RotateCw
 } from 'lucide-react';
 import { 
   RegisteredDevice, 
@@ -333,7 +334,9 @@ export default function SettingsView({
   // Registered Devices (Max 4 devices, 2 swaps per month)
   const [registeredDevices, setRegisteredDevices] = useState<RegisteredDevice[]>([]);
   const [deviceSwapHistory, setDeviceSwapHistory] = useState<DeviceSwapRecord[]>([]);
+  const [resettingDevices, setResettingDevices] = useState(false);
   const currentDeviceId = getOrCreateDeviceId();
+  const isAdmin = user?.email === 'paulhallum@gmail.com' || user?.email === 'paulhallum@googlemail.com';
 
   useEffect(() => {
     if (!tradeUserId) return;
@@ -345,6 +348,34 @@ export default function SettingsView({
   }, [tradeUserId]);
 
   const { swapsRemaining, nextAvailableSwapDate } = calculateSwapsRemaining(deviceSwapHistory);
+
+  const handleAdminDeviceReset = async () => {
+    if (!tradeUserId) return;
+    setResettingDevices(true);
+    try {
+      await setDoc(doc(db, 'trade_users', tradeUserId), {
+        registeredDevices: [],
+        deviceSwapHistory: []
+      }, { merge: true });
+      showToast('All registered device slots and swap history have been reset', 'success');
+    } catch (err: any) {
+      showToast('Reset failed: ' + err.message, 'error');
+    } finally {
+      setResettingDevices(false);
+    }
+  };
+
+  const handleAdminSetPremium = async () => {
+    if (!tradeUserId) return;
+    try {
+      await setDoc(doc(db, 'trade_users', tradeUserId), {
+        subscriptionTier: 'premium'
+      }, { merge: true });
+      showToast('Subscription tier set to Premium', 'success');
+    } catch (err: any) {
+      showToast('Failed to set premium: ' + err.message, 'error');
+    }
+  };
 
   const handleRemoveDevice = (dev: RegisteredDevice) => {
     if (!tradeUserId) return;
@@ -997,80 +1028,114 @@ export default function SettingsView({
           <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm transition-all">
             <button
               onClick={() => toggleSection('billing')}
-              className="w-full p-4 sm:p-5 flex items-center justify-between text-left hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors"
+              className="w-full p-4 sm:p-6 flex items-center justify-between text-left hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors"
             >
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+              <div className="flex items-center gap-3.5 min-w-0">
+                <div className="w-11 h-11 rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
                   <CreditCard className="w-5 h-5" />
                 </div>
                 <div className="min-w-0">
-                  <h4 className="text-sm font-bold text-zinc-900 dark:text-white truncate">
+                  <h4 className="text-base font-black text-zinc-900 dark:text-white truncate">
                     Subscription & Billing
                   </h4>
-                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate mt-0.5">
-                    {isTrial ? `21-Day Trial (${trialDaysRemaining} days left)` : subscriptionTier === 'premium' ? 'Premium Active (£7.95/mo)' : 'Free Tier'}
+                  <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 truncate mt-0.5">
+                    {isTrial ? `21-Day Trial (${trialDaysRemaining} days remaining)` : subscriptionTier === 'premium' ? 'Premium Active (£7.95/mo)' : 'Free Tier'}
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800/30">
+              <div className="flex items-center gap-3 shrink-0">
+                <span className={`text-xs font-black uppercase tracking-wider px-3 py-1 rounded-full border ${
+                  isTrial 
+                    ? 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800' 
+                    : subscriptionTier === 'premium' 
+                    ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' 
+                    : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700'
+                }`}>
                   {isTrial ? 'Trial' : subscriptionTier === 'premium' ? 'Premium' : 'Free'}
                 </span>
-                <ChevronDown className={`w-4 h-4 text-zinc-400 transition-transform duration-200 ${openSections.billing ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`w-5 h-5 text-zinc-400 transition-transform duration-200 ${openSections.billing ? 'rotate-180' : ''}`} />
               </div>
             </button>
 
             {openSections.billing && (
-              <div className="p-4 sm:p-5 pt-0 space-y-4 border-t border-zinc-100 dark:border-zinc-800/60 mt-2">
-          <div className="flex items-center justify-between gap-4 flex-wrap sm:flex-nowrap">
-            <div>
-              <h4 className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-                💳 Subscription & Plan
-              </h4>
-              <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">
-                {isTrial 
-                  ? `You are on your 21-Day Reverse Premium Trial (${trialDaysRemaining} ${trialDaysRemaining === 1 ? 'day' : 'days'} remaining). Subscribe to continue full use.`
-                  : (subscriptionTier === 'premium' 
-                    ? 'You are on Premium (£7.95/mo). Enjoy full AI features (Fair Use Policy applies), Voice Readout, custom themes, and unlimited Trade Users!' 
-                    : 'AI features are not available without a subscription. Subscribe to Premium (£7.95/mo or £79/yr) to unlock AI Daily Briefings, Voice Readout, and Magic Mic AI.')}
-              </p>
-            </div>
-            <div className="shrink-0 w-full sm:w-auto">
-              {subscriptionTier === 'premium' && !isTrial ? (
-                <button
-                  onClick={handleManageSubscription}
-                  disabled={loadingCheckout}
-                  className="w-full sm:w-auto px-4 py-2 bg-zinc-800 hover:bg-zinc-700 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-white text-[11px] font-black uppercase tracking-widest rounded-xl transition-all active:scale-95 flex items-center justify-center gap-2 border border-zinc-700"
-                >
-                  {loadingCheckout ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      Loading...
-                    </>
-                  ) : (
-                    'Manage in Stripe'
-                  )}
-                </button>
-              ) : (
-                <div className="flex flex-col sm:flex-row items-center gap-2">
-                  <button
-                    onClick={() => handleUpgrade('monthly')}
-                    disabled={loadingCheckout}
-                    className="w-full sm:w-auto px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-[11px] font-black uppercase tracking-widest rounded-xl transition-all active:scale-95 flex items-center justify-center gap-2"
-                  >
-                    {loadingCheckout ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Monthly (£7.95)'}
-                  </button>
-                  <button
-                    onClick={() => handleUpgrade('yearly')}
-                    disabled={loadingCheckout}
-                    className="w-full sm:w-auto px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-black uppercase tracking-widest rounded-xl transition-all active:scale-95 flex items-center justify-center gap-2 border border-emerald-400/40 shadow-sm"
-                  >
-                    {loadingCheckout ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Yearly (£79.00)'}
-                  </button>
+              <div className="p-4 sm:p-6 pt-0 space-y-5 border-t border-zinc-100 dark:border-zinc-800/60 mt-2">
+                {/* Elevated Plan Status Card */}
+                <div className="p-5 sm:p-6 bg-gradient-to-br from-zinc-50 to-emerald-50/30 dark:from-zinc-800/60 dark:to-emerald-950/20 rounded-3xl border border-zinc-200 dark:border-zinc-800 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
+                          {isTrial ? 'Current Trial' : subscriptionTier === 'premium' ? 'Active Membership' : 'Standard Account'}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                          subscriptionTier === 'premium' && !isTrial 
+                            ? 'bg-emerald-500 text-white' 
+                            : isTrial 
+                            ? 'bg-amber-500 text-white' 
+                            : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300'
+                        }`}>
+                          {isTrial ? '21-Day Trial' : subscriptionTier === 'premium' ? 'Premium' : 'Free'}
+                        </span>
+                      </div>
+                      <h3 className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white mt-1">
+                        {isTrial 
+                          ? 'Reverse Premium Trial' 
+                          : subscriptionTier === 'premium' 
+                          ? 'TribeTrade Solo Trader Premium' 
+                          : 'Free Basic Tier'}
+                      </h3>
+                      <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mt-1 max-w-xl">
+                        {isTrial 
+                          ? `You are currently enjoying full Premium access with ${trialDaysRemaining} ${trialDaysRemaining === 1 ? 'day' : 'days'} remaining on your trial.` 
+                          : subscriptionTier === 'premium' 
+                          ? 'Your subscription is active! You have full access to hands-free voice AI, briefings, van mileage, and MTD tax export.' 
+                          : 'Subscribe to Premium (£7.95/mo or £79/yr) to unlock AI Daily Briefings, Voice Readout, and Magic Mic AI.'}
+                      </p>
+                      {currentPeriodEnd && subscriptionTier === 'premium' && (
+                        <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 mt-2">
+                          {cancelAtPeriodEnd ? 'Access active until: ' : 'Renews on: '}
+                          {currentPeriodEnd.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="shrink-0">
+                      {subscriptionTier === 'premium' && !isTrial ? (
+                        <button
+                          onClick={handleManageSubscription}
+                          disabled={loadingCheckout}
+                          className="w-full sm:w-auto px-5 py-3 bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-xs font-black uppercase tracking-wider rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-2 shadow-md"
+                        >
+                          {loadingCheckout ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Loading...
+                            </>
+                          ) : (
+                            'Manage in Stripe'
+                          )}
+                        </button>
+                      ) : (
+                        <div className="flex flex-col sm:flex-row items-center gap-2.5">
+                          <button
+                            onClick={() => handleUpgrade('monthly')}
+                            disabled={loadingCheckout}
+                            className="w-full sm:w-auto px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-2 shadow-md"
+                          >
+                            {loadingCheckout ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Subscribe Monthly (£7.95)'}
+                          </button>
+                          <button
+                            onClick={() => handleUpgrade('yearly')}
+                            disabled={loadingCheckout}
+                            className="w-full sm:w-auto px-5 py-3 bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-white text-xs font-black uppercase tracking-wider rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-2 border border-zinc-700"
+                          >
+                            {loadingCheckout ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Yearly (£79.00 / save 17%)'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              )}
-            </div>
-          </div>
 
           {/* Cancellation Reference to Guide Page */}
           <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800/80 flex flex-wrap items-center justify-between gap-2 text-[11px]">
@@ -1091,6 +1156,20 @@ export default function SettingsView({
               <ArrowRight className="w-3 h-3 text-emerald-500" />
             </button>
           </div>
+
+          {/* Admin Subscription Override */}
+          {isAdmin && subscriptionTier !== 'premium' && (
+            <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800/80">
+              <button
+                onClick={handleAdminSetPremium}
+                className="w-full px-4 py-2.5 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/25 text-purple-600 dark:text-purple-400 rounded-xl text-xs font-bold inline-flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+                title="Override subscription to Premium (Admin only)"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Force Set Premium (Admin Override)</span>
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -1782,7 +1861,7 @@ export default function SettingsView({
                 <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
           
           {/* 1. Google Services (Prominent Primary Integration) */}
-          <div className="p-4 sm:p-5 flex items-center justify-between gap-4">
+          <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
             <div className="flex items-center gap-3.5 min-w-0">
               <div className="w-11 h-11 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700/60 rounded-2xl flex items-center justify-center shrink-0 shadow-sm">
                 <GoogleIcon className="w-6 h-6" isColoured={isGoogleConnected} />
@@ -1796,7 +1875,7 @@ export default function SettingsView({
               </div>
             </div>
             
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-zinc-100 dark:border-zinc-800/60">
               {isGoogleConnected ? (
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase tracking-widest rounded-xl border border-emerald-200 dark:border-emerald-800/50">
@@ -1834,7 +1913,7 @@ export default function SettingsView({
               ) : (
                 <button
                   onClick={reconnectGoogle}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-black uppercase tracking-widest rounded-xl transition-all shadow-sm active:scale-95 flex items-center gap-2"
+                  className="w-full sm:w-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-black uppercase tracking-widest rounded-xl transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2"
                 >
                   <GoogleIcon className="w-4 h-4" isColoured={false} />
                   Connect Google
@@ -1847,22 +1926,22 @@ export default function SettingsView({
           {(() => {
             const gmailAccount = connectedAccounts.find(a => a.provider === 'google' || a.provider === 'gmail');
             return (
-              <div className="p-4 sm:p-5 flex items-center justify-between gap-4">
+              <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
                 <div className="flex items-center gap-3.5 min-w-0">
                   <div className="w-11 h-11 bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900/40 rounded-2xl flex items-center justify-center shrink-0">
                     <GoogleIcon className="w-5 h-5" isColoured={!!gmailAccount} />
                   </div>
                   <div className="min-w-0">
                     <span className="text-sm font-bold text-zinc-900 dark:text-white truncate">Gmail Inbox</span>
-                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5 truncate">
                       {gmailAccount ? gmailAccount.emailAddress : 'Live Gmail inbox sync via Google App Password'}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-zinc-100 dark:border-zinc-800/60">
                   {gmailAccount ? (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
                       <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase tracking-widest rounded-xl border border-emerald-200 dark:border-emerald-800/50">
                         <Check className="w-3.5 h-3.5" />
                         Connected
@@ -1881,7 +1960,7 @@ export default function SettingsView({
                         setPasswordModalProvider('google');
                         setIsPasswordModalOpen(true);
                       }}
-                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-[11px] font-black uppercase tracking-widest rounded-xl transition-all shadow-sm active:scale-95 flex items-center gap-2"
+                      className="w-full sm:w-auto px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-[11px] font-black uppercase tracking-widest rounded-xl transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2"
                     >
                       <GoogleIcon className="w-4 h-4" isColoured={false} />
                       Connect
@@ -1896,22 +1975,22 @@ export default function SettingsView({
           {(() => {
             const msAccount = connectedAccounts.find(a => a.provider === 'microsoft' || a.provider === 'outlook');
             return (
-              <div className="p-4 sm:p-5 flex items-center justify-between gap-4">
+              <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
                 <div className="flex items-center gap-3.5 min-w-0">
                   <div className="w-11 h-11 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700/60 rounded-2xl flex items-center justify-center shrink-0">
                     <MicrosoftIcon className="w-5 h-5" isColoured={!!msAccount} />
                   </div>
                   <div className="min-w-0">
                     <span className="text-sm font-bold text-zinc-900 dark:text-white truncate">Microsoft Outlook</span>
-                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5 truncate">
                       {msAccount ? msAccount.emailAddress : 'Outlook, Office 365 & Hotmail sync'}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-zinc-100 dark:border-zinc-800/60">
                   {msAccount ? (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
                       <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase tracking-widest rounded-xl border border-emerald-200 dark:border-emerald-800/50">
                         <Check className="w-3.5 h-3.5" />
                         Connected
@@ -1928,7 +2007,7 @@ export default function SettingsView({
                     <button
                       onClick={() => handleOAuthConnect('microsoft')}
                       disabled={connectingProvider === 'microsoft'}
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-black uppercase tracking-widest rounded-xl transition-all shadow-sm active:scale-95 flex items-center gap-2 disabled:opacity-50"
+                      className="w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-black uppercase tracking-widest rounded-xl transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50"
                     >
                       {connectingProvider === 'microsoft' ? (
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -1947,22 +2026,22 @@ export default function SettingsView({
           {(() => {
             const yahooAccount = connectedAccounts.find(a => a.provider === 'yahoo' || a.provider === 'sky');
             return (
-              <div className="p-4 sm:p-5 flex items-center justify-between gap-4">
+              <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
                 <div className="flex items-center gap-3.5 min-w-0">
                   <div className="w-11 h-11 bg-purple-50 dark:bg-purple-950/30 border border-purple-100 dark:border-purple-900/40 rounded-2xl flex items-center justify-center shrink-0">
                     <YahooIcon className="w-5 h-5" isColoured={!!yahooAccount} />
                   </div>
                   <div className="min-w-0">
                     <span className="text-sm font-bold text-zinc-900 dark:text-white truncate">Sky Mail & Yahoo Mail</span>
-                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5 truncate">
                       {yahooAccount ? yahooAccount.emailAddress : 'Sky Mail & Yahoo Mail inbox sync'}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-zinc-100 dark:border-zinc-800/60">
                   {yahooAccount ? (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
                       <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase tracking-widest rounded-xl border border-emerald-200 dark:border-emerald-800/50">
                         <Check className="w-3.5 h-3.5" />
                         Connected
@@ -1979,7 +2058,7 @@ export default function SettingsView({
                     <button
                       onClick={() => handleOAuthConnect('yahoo')}
                       disabled={connectingProvider === 'yahoo'}
-                      className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-black uppercase tracking-widest rounded-xl transition-all shadow-sm active:scale-95 flex items-center gap-2 disabled:opacity-50"
+                      className="w-full sm:w-auto px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-black uppercase tracking-widest rounded-xl transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50"
                     >
                       {connectingProvider === 'yahoo' ? (
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -1998,22 +2077,22 @@ export default function SettingsView({
           {(() => {
             const appleAccount = connectedAccounts.find(a => a.provider === 'apple');
             return (
-              <div className="p-4 sm:p-5 flex items-center justify-between gap-4">
+              <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
                 <div className="flex items-center gap-3.5 min-w-0">
                   <div className="w-11 h-11 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700/60 rounded-2xl flex items-center justify-center shrink-0">
                     <AppleIcon className="w-5 h-5 text-zinc-900 dark:text-white" isColoured={true} />
                   </div>
                   <div className="min-w-0">
                     <span className="text-sm font-bold text-zinc-900 dark:text-white truncate">Apple Mail (iCloud)</span>
-                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5 truncate">
                       {appleAccount ? appleAccount.emailAddress : 'iCloud mail & Apple account sync'}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-zinc-100 dark:border-zinc-800/60">
                   {appleAccount ? (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
                       <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase tracking-widest rounded-xl border border-emerald-200 dark:border-emerald-800/50">
                         <Check className="w-3.5 h-3.5" />
                         Connected
@@ -2032,7 +2111,7 @@ export default function SettingsView({
                         setPasswordModalProvider('apple');
                         setIsPasswordModalOpen(true);
                       }}
-                      className="px-4 py-2 bg-zinc-900 dark:bg-white hover:bg-zinc-800 dark:hover:bg-zinc-100 text-white dark:text-zinc-900 text-[11px] font-black uppercase tracking-widest rounded-xl transition-all shadow-xs flex items-center gap-2 active:scale-95 cursor-pointer"
+                      className="w-full sm:w-auto px-4 py-2 bg-zinc-900 dark:bg-white hover:bg-zinc-800 dark:hover:bg-zinc-100 text-white dark:text-zinc-900 text-[11px] font-black uppercase tracking-widest rounded-xl transition-all shadow-xs flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
                     >
                       <AppleIcon className="w-4 h-4 text-white dark:text-zinc-900" isColoured={false} />
                       Connect
@@ -2138,6 +2217,21 @@ export default function SettingsView({
             <p className="text-[11px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 p-2.5 rounded-xl border border-amber-200 dark:border-amber-800/60">
               You have used your 2 device changes for this rolling 30-day window. Your next device change will unlock on {nextAvailableSwapDate}.
             </p>
+          )}
+
+          {/* Admin Reset Button */}
+          {isAdmin && (
+            <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800">
+              <button
+                onClick={handleAdminDeviceReset}
+                disabled={resettingDevices}
+                className="w-full px-4 py-2.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 text-amber-600 dark:text-amber-400 rounded-xl text-xs font-bold inline-flex items-center justify-center gap-2 transition-all disabled:opacity-50 active:scale-[0.98]"
+                title="Reset all registered devices and monthly swap history (Admin only)"
+              >
+                <RotateCw className={`w-3.5 h-3.5 ${resettingDevices ? 'animate-spin' : ''}`} />
+                <span>{resettingDevices ? 'Resetting...' : 'Reset All Devices & Swap History (Admin)'}</span>
+              </button>
+            </div>
           )}
         </div>
       </div>

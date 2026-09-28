@@ -102,38 +102,38 @@ export async function incrementNearbyUsage(userId: string, tradeUserIdHint?: str
   const userRef = doc(db, 'users', userId);
   const billingInfo = await fetchBillingInfo(userId);
 
+  const userSnap = await getDoc(userRef);
+  if (!userSnap.exists()) {
+    throw new Error('USER_NOT_FOUND');
+  }
+
+  const userData = userSnap.data();
+  const tradeUserId = tradeUserIdHint || userData.tradeUserId || `family_${userId}`;
+  let tier = userData.subscriptionTier || 'free';
+  let isBeta = billingInfo.isBeta;
+  let trialEndsAtRaw: any = billingInfo.trialEndsAtRaw;
+
+  const familyRef = doc(db, 'trade_users', tradeUserId);
+  const familySnap = await getDoc(familyRef);
+
+  if (familySnap.exists()) {
+    const familyData = familySnap.data();
+    if (familyData.subscriptionTier === 'premium') {
+      tier = 'premium';
+    }
+    if (familyData.isBetaTester === true) {
+      isBeta = true;
+    }
+  }
+
+  const isPremium = checkIsActivePremium(tier, isBeta, trialEndsAtRaw);
+  const limit = isPremium ? 5 : 0;
+  const usageRef = doc(db, 'trade_users', tradeUserId, 'usage', today);
+
   await runTransaction(db, async (transaction) => {
-    const userSnap = await transaction.get(userRef);
-    if (!userSnap.exists()) {
-      throw new Error('USER_NOT_FOUND');
-    }
-
-    const userData = userSnap.data();
-    const tradeUserId = tradeUserIdHint || userData.tradeUserId || `family_${userId}`;
-    let tier = userData.subscriptionTier || 'free';
-    let isBeta = billingInfo.isBeta;
-    let trialEndsAtRaw: any = billingInfo.trialEndsAtRaw;
-
-    const familyRef = doc(db, 'trade_users', tradeUserId);
-    const familySnap = await transaction.get(familyRef);
-
-    if (familySnap.exists()) {
-      const familyData = familySnap.data();
-      if (familyData.subscriptionTier === 'premium') {
-        tier = 'premium';
-      }
-      if (familyData.isBetaTester === true) {
-        isBeta = true;
-      }
-    }
-
-    const isPremium = checkIsActivePremium(tier, isBeta, trialEndsAtRaw);
-
-    const usageRef = doc(db, 'trade_users', tradeUserId, 'usage', today);
     const usageSnap = await transaction.get(usageRef);
     const currentRuns = usageSnap.exists() ? (usageSnap.data().nearbyRuns || 0) : 0;
 
-    const limit = isPremium ? 5 : 0;
     if (currentRuns >= limit) {
       throw new Error('LIMIT_EXCEEDED');
     }
@@ -153,44 +153,44 @@ export async function incrementSmartConvertUsage(userId: string): Promise<void> 
   const userRef = doc(db, 'users', userId);
   const billingInfo = await fetchBillingInfo(userId);
 
+  const userSnap = await getDoc(userRef);
+  if (!userSnap.exists()) {
+    throw new Error('USER_NOT_FOUND');
+  }
+
+  const userData = userSnap.data();
+  const tradeUserId = userData.tradeUserId || `trade_${userId}`;
+  let tier = userData.subscriptionTier || 'free';
+  let isBeta = billingInfo.isBeta;
+  let trialEndsAtRaw: any = billingInfo.trialEndsAtRaw;
+
+  const familyRef = doc(db, 'trade_users', tradeUserId);
+  const familySnap = await getDoc(familyRef);
+
+  if (familySnap.exists()) {
+    const familyData = familySnap.data();
+    if (familyData.subscriptionTier === 'premium') {
+      tier = 'premium';
+    }
+    if (familyData.isBetaTester === true) {
+      isBeta = true;
+    }
+  }
+
+  const isPremium = checkIsActivePremium(tier, isBeta, trialEndsAtRaw);
+  const limit = isPremium ? 20 : 0;
+  const usageRef = doc(db, 'trade_users', tradeUserId, 'usage', today);
+
   await runTransaction(db, async (transaction) => {
-    const userSnap = await transaction.get(userRef);
-    if (!userSnap.exists()) {
-      throw new Error('USER_NOT_FOUND');
-    }
-
-    const userData = userSnap.data();
-    const tradeUserId = userData.tradeUserId || `family_${userId}`;
-    let tier = userData.subscriptionTier || 'free';
-    let isBeta = billingInfo.isBeta;
-    let trialEndsAtRaw: any = billingInfo.trialEndsAtRaw;
-
-    const familyRef = doc(db, 'trade_users', tradeUserId);
-    const familySnap = await transaction.get(familyRef);
-
-    if (familySnap.exists()) {
-      const familyData = familySnap.data();
-      if (familyData.subscriptionTier === 'premium') {
-        tier = 'premium';
-      }
-      if (familyData.isBetaTester === true) {
-        isBeta = true;
-      }
-    }
-
-    const isPremium = checkIsActivePremium(tier, isBeta, trialEndsAtRaw);
-
-    const usageRef = doc(db, 'trade_users', tradeUserId, 'usage', today);
     const usageSnap = await transaction.get(usageRef);
-    const currentRuns = usageSnap.exists() ? (usageSnap.data().smartConvertRuns || 0) : 0;
+    const currentRuns = usageSnap.exists() ? (usageSnap.data().smartConvertUses || 0) : 0;
 
-    const limit = isPremium ? 20 : 0;
     if (currentRuns >= limit) {
       throw new Error('LIMIT_EXCEEDED');
     }
 
     transaction.set(usageRef, {
-      smartConvertRuns: currentRuns + 1,
+      smartConvertUses: currentRuns + 1,
       updatedAt: new Date().toISOString()
     }, { merge: true });
   });
@@ -204,44 +204,44 @@ export async function incrementSmartCaptureUsage(userId: string): Promise<void> 
   const userRef = doc(db, 'users', userId);
   const billingInfo = await fetchBillingInfo(userId);
 
+  const userSnap = await getDoc(userRef);
+  if (!userSnap.exists()) {
+    throw new Error('USER_NOT_FOUND');
+  }
+
+  const userData = userSnap.data();
+  const tradeUserId = userData.tradeUserId || `trade_${userId}`;
+  let tier = userData.subscriptionTier || 'free';
+  let isBeta = billingInfo.isBeta;
+  let trialEndsAtRaw: any = billingInfo.trialEndsAtRaw;
+
+  const familyRef = doc(db, 'trade_users', tradeUserId);
+  const familySnap = await getDoc(familyRef);
+
+  if (familySnap.exists()) {
+    const familyData = familySnap.data();
+    if (familyData.subscriptionTier === 'premium') {
+      tier = 'premium';
+    }
+    if (familyData.isBetaTester === true) {
+      isBeta = true;
+    }
+  }
+
+  const isPremium = checkIsActivePremium(tier, isBeta, trialEndsAtRaw);
+  const limit = isPremium ? 20 : 0;
+  const usageRef = doc(db, 'trade_users', tradeUserId, 'usage', today);
+
   await runTransaction(db, async (transaction) => {
-    const userSnap = await transaction.get(userRef);
-    if (!userSnap.exists()) {
-      throw new Error('USER_NOT_FOUND');
-    }
-
-    const userData = userSnap.data();
-    const tradeUserId = userData.tradeUserId || `family_${userId}`;
-    let tier = userData.subscriptionTier || 'free';
-    let isBeta = billingInfo.isBeta;
-    let trialEndsAtRaw: any = billingInfo.trialEndsAtRaw;
-
-    const familyRef = doc(db, 'trade_users', tradeUserId);
-    const familySnap = await transaction.get(familyRef);
-
-    if (familySnap.exists()) {
-      const familyData = familySnap.data();
-      if (familyData.subscriptionTier === 'premium') {
-        tier = 'premium';
-      }
-      if (familyData.isBetaTester === true) {
-        isBeta = true;
-      }
-    }
-
-    const isPremium = checkIsActivePremium(tier, isBeta, trialEndsAtRaw);
-
-    const usageRef = doc(db, 'trade_users', tradeUserId, 'usage', today);
     const usageSnap = await transaction.get(usageRef);
-    const currentRuns = usageSnap.exists() ? (usageSnap.data().smartCaptureRuns || 0) : 0;
+    const currentRuns = usageSnap.exists() ? (usageSnap.data().smartCaptureUses || 0) : 0;
 
-    const limit = isPremium ? 20 : 0;
     if (currentRuns >= limit) {
       throw new Error('LIMIT_EXCEEDED');
     }
 
     transaction.set(usageRef, {
-      smartCaptureRuns: currentRuns + 1,
+      smartCaptureUses: currentRuns + 1,
       updatedAt: new Date().toISOString()
     }, { merge: true });
   });

@@ -20,9 +20,12 @@ import {
   Info,
   ChevronDown,
   Calculator,
-  PenLine
+  PenLine,
+  Truck,
+  ShieldAlert
 } from 'lucide-react';
 import SelfAssessmentModal from './SelfAssessmentModal';
+import MileageLogModal from './MileageLogModal';
 import {
   Transaction,
   TRANSACTION_CATEGORIES,
@@ -67,6 +70,7 @@ export default function ExpensesView() {
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isSelfAssessmentOpen, setIsSelfAssessmentOpen] = useState(false);
+  const [isMileageLogOpen, setIsMileageLogOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [extractedReceipt, setExtractedReceipt] = useState<ExtractedReceiptData | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{
@@ -322,6 +326,16 @@ export default function ExpensesView() {
           <span className="truncate">Manual Entry</span>
         </button>
 
+        {/* Van Mileage Log Button */}
+        <button
+          onClick={() => setIsMileageLogOpen(true)}
+          className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 py-2.5 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-amber-800 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/60 rounded-xl sm:rounded-2xl text-xs font-bold shadow-sm transition-all active:scale-95"
+          title="Open Van Mileage Log (HMRC Compliant 45p/mile)"
+        >
+          <Truck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+          <span className="truncate">Van Mileage</span>
+        </button>
+
         {/* Self Assessment Preparation Assistant Button */}
         <button
           onClick={() => setIsSelfAssessmentOpen(true)}
@@ -330,16 +344,6 @@ export default function ExpensesView() {
         >
           <Calculator className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
           <span className="truncate">Self Assessment</span>
-        </button>
-
-        {/* Export for MTD CSV Button */}
-        <button
-          onClick={handleExportMtdCsv}
-          className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 py-2.5 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/60 rounded-xl sm:rounded-2xl text-xs font-bold shadow-sm transition-all active:scale-95"
-          title="Download HMRC Making Tax Digital compliant CSV for your accountant"
-        >
-          <FileSpreadsheet className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-          <span className="truncate">Export MTD CSV</span>
         </button>
       </div>
 
@@ -564,19 +568,60 @@ export default function ExpensesView() {
         )}
       </div>
 
-      {/* HMRC & Legal Disclaimer Card */}
-      <div className="p-4 bg-zinc-50 dark:bg-zinc-800/40 rounded-3xl border border-zinc-200 dark:border-zinc-800 flex items-start gap-3">
-        <ShieldCheck className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-        <div className="space-y-1 text-xs text-zinc-600 dark:text-zinc-400">
-          <p className="font-bold text-zinc-900 dark:text-zinc-200">
-            HMRC Compliance & AI Accuracy Notice
-          </p>
-          <p className="text-[11px] leading-relaxed">
-            <strong>1. Keep Physical Receipts:</strong> Under UK tax legislation (TMA 1970 s12B), sole traders must keep records for at least 5 years and limited companies for 6 years from the 31 January tax return deadline. Tribe Trade processes receipts in volatile memory for privacy and does NOT store receipt images. You must retain original paper receipts or your own digital copies for HMRC inspection.
-          </p>
-          <p className="text-[11px] leading-relaxed">
-            <strong>2. AI Extraction Verification:</strong> While our OCR models are trained on UK merchant receipts, AI can misread faded print or complex till slips. Always check and confirm extracted figures. Tribe Trade provides digital bookkeeping assistance and MTD CSV exports, but is not a regulated tax advisor.
-          </p>
+      {/* Export Section - Below Entries Ledger, Above Disclaimers */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3.5 sm:p-4 bg-white dark:bg-zinc-900 rounded-2xl sm:rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+            <FileSpreadsheet className="w-4 h-4 sm:w-5 sm:h-5" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-bold text-zinc-900 dark:text-white truncate">
+              Making Tax Digital (MTD) Export
+            </p>
+            <p className="text-[11px] text-zinc-500 truncate">
+              Download accountant-ready CSV for {periodFilter === 'all' ? 'all recorded transactions' : periodFilter === 'current_tax_year' ? 'Tax Year 2025/26' : periodFilter === 'previous_tax_year' ? 'Tax Year 2024/25' : 'the selected quarter'}
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={handleExportMtdCsv}
+          className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95 shrink-0"
+          title="Download HMRC Making Tax Digital compliant CSV for your accountant"
+        >
+          <Download className="w-4 h-4 shrink-0" />
+          <span>Export MTD CSV</span>
+        </button>
+      </div>
+
+      {/* Footer Disclaimers: Financial Notice & HMRC Compliance */}
+      <div className="pt-6 mt-8 border-t border-zinc-200/80 dark:border-zinc-800/80">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {/* Important Financial Notice */}
+          <div className="p-3.5 sm:p-4 bg-zinc-50 dark:bg-zinc-900/60 rounded-2xl border border-zinc-200 dark:border-zinc-800/80 flex items-start gap-3">
+            <ShieldAlert className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+            <div className="space-y-0.5 text-xs text-zinc-600 dark:text-zinc-400">
+              <p className="font-semibold text-zinc-900 dark:text-zinc-200">
+                Important Financial Notice
+              </p>
+              <p className="text-[11px] leading-relaxed">
+                TribeTrade is an AI trade assistant and digital bookkeeping tool, not a certified accountant or registered tax adviser. All figures, VAT calculations, expenses, and MTD exports must be reviewed and verified by you or your accountant before submission to HMRC.
+              </p>
+            </div>
+          </div>
+
+          {/* HMRC Compliance Notice */}
+          <div className="p-3.5 sm:p-4 bg-zinc-50 dark:bg-zinc-900/60 rounded-2xl border border-zinc-200 dark:border-zinc-800/80 flex items-start gap-3">
+            <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+            <div className="space-y-0.5 text-xs text-zinc-600 dark:text-zinc-400">
+              <p className="font-semibold text-zinc-900 dark:text-zinc-200">
+                HMRC Compliance & Record Keeping
+              </p>
+              <p className="text-[11px] leading-relaxed">
+                Under UK tax legislation (TMA 1970 s12B), sole traders must retain records for at least 5 years and limited companies for 6 years from the 31 January tax return deadline. Tribe Trade processes receipts in volatile memory for privacy and does not permanently store receipt images. You must retain original paper receipts or digital copies for HMRC inspection.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -606,6 +651,13 @@ export default function ExpensesView() {
         confirmText="Delete Record"
         onConfirm={handleDelete}
         onClose={() => setConfirmDelete({ isOpen: false, id: '', vendor: '' })}
+      />
+
+      <MileageLogModal
+        isOpen={isMileageLogOpen}
+        onClose={() => setIsMileageLogOpen(false)}
+        tradeUserId={activeTradeUserId}
+        vehicles={(businessDetails as any)?.vehicles || []}
       />
 
       {isSelfAssessmentOpen && (

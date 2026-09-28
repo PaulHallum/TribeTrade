@@ -123,6 +123,44 @@ export async function updateInvoiceStatus(
     status,
     updatedAt: new Date().toISOString()
   });
+
+  // If invoice is completed or paid, automatically record as Trade Income for HMRC MTD / Expenses
+  if (status === 'completed' || status === 'paid') {
+    try {
+      const snap = await getDoc(invoiceDoc);
+      if (snap.exists()) {
+        const inv = snap.data() as Invoice;
+        const transDocRef = doc(db, 'trade_users', tradeUserId, 'transactions', `inv_trans_${invoiceId}`);
+        const grossAmount = Number(inv.grandTotal) || 0;
+        const netAmount = Number(inv.netTotal) || grossAmount;
+        const vatAmount = Number(inv.vatAmount) || 0;
+        const vatRate = Number(inv.vatRate) || 20;
+
+        await setDoc(transDocRef, {
+          id: `inv_trans_${invoiceId}`,
+          type: 'income',
+          date: inv.dateIssued || new Date().toISOString().split('T')[0],
+          vendor: inv.customerName || 'Trade Client',
+          category: 'trade_income',
+          categoryLabel: 'Turnover / Trade Sales & Work Completed',
+          hmrcBox: 'Box 10: Turnover / Trade Income',
+          description: `Invoice ${inv.invoiceNumber}: ${inv.jobTitle || 'Trade Works'}`,
+          reference: inv.invoiceNumber,
+          netAmount,
+          vatRate: inv.isVatRegistered ? vatRate : 0,
+          vatAmount: inv.isVatRegistered ? vatAmount : 0,
+          grossAmount,
+          paymentMethod: 'bank_transfer',
+          source: 'manual',
+          notes: `Automated income recording from completed Invoice ${inv.invoiceNumber}`,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      }
+    } catch (transErr) {
+      console.warn('Failed to auto-record invoice completion to expenses/income transactions:', transErr);
+    }
+  }
 }
 
 /**
@@ -186,3 +224,136 @@ export async function convertQuoteToInvoice(
     createdAt: today.toISOString()
   } as Invoice;
 }
+
+/**
+ * Reverts an invoice back to a quote.
+ * Deletes the invoice and clears the quote's invoiceId so it reappears in active quotes.
+ */
+export async function revertInvoiceToQuote(
+  tradeUserId: string,
+  invoice: Invoice
+): Promise<void> {
+  // 1. Delete the invoice
+  await deleteInvoice(tradeUserId, invoice.id);
+
+  // 2. Unlink the quote if referenced
+  if (invoice.quoteId) {
+    try {
+      const quoteDoc = doc(db, 'trade_users', tradeUserId, 'quotes', invoice.quoteId);
+      await updateDoc(quoteDoc, {
+        invoiceId: '',
+        status: 'accepted',
+        updatedAt: new Date().toISOString()
+      });
+    } catch (err) {
+      logger.warn('Failed to unlink quote from reverted invoice', err);
+    }
+  }
+}
+
+/**
+ * Escapes values for CSV output
+ */
+function escapeCsv(val: any): string {
+  if (val === undefined || val === null) return '""';
+  const str = String(val).replace(/"/g, '""');
+  return `"${str}"`;
+}
+
+/**
+ * Generates an Invoice Summary CSV export compatible with Xero and UK accounting spreadsheets.
+ */
+export function generateInvoiceSummaryCsv(
+  invoices: Invoice[],
+  businessDetails?: any
+): string {
+  const lines: string[] = [];
+
+  // Metadata headers
+  lines.push('"TRIBE TRADE - INVOICE SUMMARY EXPORT (XERO / SPREADSHEET COMPATIBLE)"');
+  lines.push(`"Business Name:",${escapeCsv(businessDetails?.businessName || 'Trade Business')}`);
+  if (businessDetails?.vatNumber) {
+    lines.push(`"VAT Registration:",${escapeCsv(businessDetails.vatNumber)}`);
+  }
+  lines.push(`"Export Generated At:",${escapeCsv(new Date().toLocaleString('en-GB'))}`);
+  lines.push(`"Total Invoices:",${invoices.length}`);
+  lines.push('');
+
+  // Table Headers
+  const headers = [
+    'Invoice Number',
+    'Customer Name',
+    'Customer Email',
+    'Customer Phone',
+    'Customer Address',
+    'Job Description',
+    'Date Issued',
+    'Due Date',
+    'Status',
+    'Labour Net (£)',
+    'Materials Net (£)',
+    'Net Subtotal (£)',
+    'VAT Rate (%)',
+    'VAT Amount (£)',
+    'Grand Total (£)',
+    'Quote Reference',
+    'Payment Terms'
+  ];
+  lines.push(headers.map(escapeCsv).join(','));
+
+  // Rows
+  let totalNet = 0;
+  let totalVat = 0;
+  let totalGross = 0;
+
+  invoices.forEach(inv => {
+    totalNet += inv.netTotal || 0;
+    totalVat += inv.vatAmount || 0;
+    totalGross += inv.grandTotal || 0;
+
+    const row = [
+      inv.invoiceNumber || '',
+      inv.customerName || '',
+      inv.customerEmail || '',
+      inv.customerPhone || '',
+      inv.customerAddress || '',
+      inv.jobTitle || '',
+      inv.dateIssued || '',
+      inv.dueDate || '',
+      inv.status || 'draft',
+      (inv.subtotalLabour || 0).toFixed(2),
+      (inv.subtotalMaterials || 0).toFixed(2),
+      (inv.netTotal || 0).toFixed(2),
+      (inv.vatRate || 0).toString(),
+      (inv.vatAmount || 0).toFixed(2),
+      (inv.grandTotal || 0).toFixed(2),
+      inv.quoteNumber || '',
+      inv.paymentTerms || ''
+    ];
+    lines.push(row.map(escapeCsv).join(','));
+  });
+
+  lines.push('');
+  lines.push([
+    '"TOTALS"',
+    '""',
+    '""',
+    '""',
+    '""',
+    '""',
+    '""',
+    '""',
+    '""',
+    '""',
+    '""',
+    `"${totalNet.toFixed(2)}"`,
+    '""',
+    `"${totalVat.toFixed(2)}"`,
+    `"${totalGross.toFixed(2)}"`,
+    '""',
+    '""'
+  ].join(','));
+
+  return lines.join('\r\n');
+}
+

@@ -28,7 +28,7 @@ export function stripHtml(html: string): string {
 
 export interface SmartConversionResult {
   actions: {
-    action: 'CREATE_TASK' | 'CREATE_CALENDAR_EVENT' | 'CREATE_NOTE' | 'CREATE_SHOPPING_ITEM' | 'CREATE_RECIPE';
+    action: 'CREATE_TASK' | 'CREATE_CALENDAR_EVENT' | 'CREATE_NOTE' | 'CREATE_SHOPPING_ITEM' | 'CREATE_RECIPE' | 'CREATE_QUOTE' | 'ADD_TO_SHED_STOCK';
     data: {
       title?: string;
       description?: string;
@@ -43,6 +43,22 @@ export interface SmartConversionResult {
       instructions?: string;
       prepTime?: string;
       servings?: string;
+      customerName?: string;
+      customerAddress?: string;
+      customerPhone?: string;
+      jobTitle?: string;
+      jobDescription?: string;
+      merchant?: string;
+      orderNumber?: string;
+      items?: any[];
+      quantity?: number;
+      unit?: string;
+      unitPrice?: number;
+      excluded?: boolean;
+      subtotalLabour?: number;
+      subtotalMaterials?: number;
+      grandTotal?: number;
+      notes?: string;
     };
   }[];
   summary: string;
@@ -87,6 +103,38 @@ function clampPastTaskDates(result: any) {
       } else {
         sanitizedActions.push(act);
       }
+    } else if (act.action === 'ADD_TO_SHED_STOCK') {
+      if (!Array.isArray(act.data?.items) || act.data.items.length === 0) {
+        if (act.data?.name || act.data?.title) {
+          act.data = {
+            ...act.data,
+            items: [{
+              name: act.data.name || act.data.title,
+              quantity: Number(act.data.quantity) || 1,
+              category: act.data.category || 'Materials',
+              unit: act.data.unit || 'units',
+              unitPrice: Number(act.data.unitPrice) || 0,
+              excluded: false
+            }]
+          };
+        } else {
+          act.data = {
+            ...act.data,
+            items: []
+          };
+        }
+      } else {
+        act.data.items = act.data.items.map((i: any) => ({
+          ...i,
+          name: i.name || 'Trade item',
+          quantity: Math.max(1, Number(i.quantity) || 1),
+          unit: i.unit || 'units',
+          category: i.category || 'Materials',
+          unitPrice: Number(i.unitPrice) || 0,
+          excluded: i.excluded === true ? true : false
+        }));
+      }
+      sanitizedActions.push(act);
     } else {
       sanitizedActions.push(act);
     }
@@ -99,7 +147,12 @@ function clampPastTaskDates(result: any) {
 export async function processSmartCapture(input: { text?: string; imageBase64?: string; mimeType?: string }, members: any[] = [], language: string = "English", isBriefingContext: boolean = false) {
   const user = auth.currentUser;
   if (user) {
-    await incrementSmartCaptureUsage(user.uid);
+    try {
+      await incrementSmartCaptureUsage(user.uid);
+    } catch (e: any) {
+      if (e?.message === 'LIMIT_EXCEEDED') throw e;
+      logger.warn('Usage counter increment failed:', e);
+    }
   }
 
   const parts: any[] = [];
@@ -114,37 +167,88 @@ export async function processSmartCapture(input: { text?: string; imageBase64?: 
     parts.push({ inlineData: { data: input.imageBase64, mimeType: input.mimeType || "image/jpeg" } });
   }
 
-  const systemInstruction = `Tribe: The Family Hub UK family assistant. Extract actionable data for Tribe: The Family Hub app.
+  const systemInstruction = `TribeTrade UK trade and business assistant. Extract actionable data from trade job notes, merchant slips, customer inquiries, and handwritten paper scribbles.
 Date: ${new Date().toLocaleString('en-GB')}
 RULES:
-- STRICT 100% ACCURACY & ZERO HALLUCINATION RULE: NEVER invent, speculate, or hallucinate real-world events, shows, locations, or dates. Only extract items explicitly present in the input text. Do NOT output a CREATE_CALENDAR_EVENT action if the venue location or date is missing, unconfirmed, or non-existent. If location or date details are missing, output ONLY a CREATE_TASK to "Check dates and location for [Event Title]".
-${isBriefingContext ? '- CONTEXT: The input text is a Daily Briefing summarizing EXISTING events/tasks. NEVER use CREATE_CALENDAR_EVENT for anything mentioned in the briefing. The event is already in the calendar. INSTEAD, ONLY suggest proactive preparation tasks (CREATE_TASK) or shopping items (CREATE_SHOPPING_ITEM) needed for those events (e.g., "Buy birthday gift for [Name]", "Get car ready for MOT", "Prepare documents").' : ''}
-- ${isBriefingContext ? 'DO NOT USE' : 'CREATE_CALENDAR_EVENT:'} ONLY for definite scheduled appointments with a 100% verified location that the user is confirmed to be attending. If the user is asking to 'book', 'buy', 'arrange', or 'plan' something (like 'book tickets for the British Motor Show'), it MUST be a CREATE_TASK, NOT a calendar event.
-- PREP TASKS & RSVPS:
-  * For RSVP tasks: ALWAYS schedule the CREATE_TASK for 7 days AFTER today (1 week after invite detection date).
-  * For Birthday or Party gifts: ALWAYS output a CREATE_TASK titled "Buy birthday gift for [Name]" (or "Buy gift for [Name]") scheduled for 7 days BEFORE the actual event/party date (or TODAY if the event date is less than 7 days away - NEVER set a date in the past!).
-- CREATE_TASK: Todos without specific times, or prep tasks for events, booking tickets, or arranging things.
-- CREATE_SHOPPING_ITEM: Items to buy.
-- CREATE_RECIPE: Cooking instructions/recipes. Extract title, ingredients (array), and instructions.
-- CREATE_NOTE: General info, standard retail receipts, everything else. (CRITICAL: If a receipt is for a flight, hotel booking, ticket, or scheduled event reservation, DO NOT create a note. Instead, extract the dates and location and output a CREATE_CALENDAR_EVENT or CREATE_TASK if unconfirmed).
-- LISTS: If a user provides a list of items (e.g. "buy milk bread and eggs"), return SEPARATE action objects for each item. Do NOT group them into one string. AI MUST check the list for distinct items even if commas are missing.
-- TIME & EVENT DURATION: Always try to extract specific times. If a time (e.g., "7pm", "noon", "15:30") is mentioned, reflect this in the ISO string. If no time is mentioned, use 09:00 as default. For CREATE_CALENDAR_EVENT, smartly estimate realistic start and end times based on the event type: an appointment or meeting is typically 1 hour (e.g., 10:00 to 11:00); a birthday party, dinner, or social event is typically 3 to 4 hours (e.g., 14:00 to 17:00 or 18:00); an all-day event, trip, festival, or holiday spans the whole day or 8 to 12 hours (e.g., 09:00 to 18:00). Always provide both "startTime" and "endTime" as ISO strings.
-- DATE CALCULATION: Be highly precise with dates. "Before the end of May" means May 31st (or earlier), NOT June 1st. Use the exact end-of-month date when requested.
-- EVENT DETAILS & URLs: If the input relates to a real-world event, show, or place, use Google Search to find specific details. You MUST structure the "description" (for tasks/events) or "content" (for notes) EXACTLY as follows:
-  **What's On:** [A summary of what it is and what to expect]
-  **Logistics:**
-  - 📅 **Dates:** [Dates it runs from and to]
-  - 📍 **Location:** [[Location Name]](https://maps.google.com/?q=[URL encoded location])
-  - 🔗 **Tickets/Website:** [URL for ticket information]
-  - ℹ️ **Requirements:** [Any requirements that may be needed]
+- STRICT 100% ACCURACY & ZERO HALLUCINATION RULE: NEVER invent or hallucinate customer details, jobs, or materials not present in the input text or image.
+- HANDWRITTEN PAPER SCRIBBLES & TRADE NOTE INTELLIGENCE:
+  1. QUOTATION / ESTIMATE / JOB PRICING:
+     When the paper scribble or note looks like a job estimate, quote draft, or client pricing calculation (e.g. customer name/address, job scope like boiler install, rewiring, bathroom tiling, plastering, labour days/rates, materials costs):
+     Return action: "CREATE_QUOTE" with:
+     {
+       "customerName": "Customer name or 'Prospective Client'",
+       "customerAddress": "Site address or postcode if mentioned",
+       "customerPhone": "Phone if mentioned",
+       "jobTitle": "Short descriptive job summary (e.g. 'Kitchen Rewire' or 'Boiler Replacement')",
+       "jobDescription": "Full scope of works outlined",
+       "items": [
+         {
+           "description": "Labour / Materials item description",
+           "type": "labour" | "material" | "hire" | "other",
+           "quantity": 1,
+           "unit": "hours" | "days" | "units" | "pack" | "metres",
+           "unitPrice": 100,
+           "total": 100
+         }
+       ],
+       "subtotalLabour": 0,
+       "subtotalMaterials": 0,
+       "grandTotal": 0,
+       "notes": "Any payment terms, validity or notes"
+     }
+  2. SHOPPING LIST / MATERIALS TO BUY:
+     When the scribble is an unpurchased list of materials to buy from a trade merchant (e.g. Screwfix, Toolstation, Travis Perkins) (e.g. 'Need 15mm copper pipe, 2x 22mm elbows, flux'):
+     Return separate "CREATE_SHOPPING_ITEM" actions for EACH distinct trade item with:
+     { "name": "Item name with quantity/dimensions (e.g. '15mm Copper Pipe 3m')", "category": "Materials" | "Tools" | "Fixings" | "Consumables" | "Other" }
+  2a. TRADE ORDER / RECEIPT / INVOICE / EMAIL (SCREWFIX, TOOLSTATION, ETC. - ASSIGN TO THE SHED):
+     When the image, text, or email is an order confirmation, till receipt, delivery note, or PDF from a trade supplier (such as Screwfix, Toolstation, Travis Perkins, City Plumbing, CEF, Selco, B&Q, etc.):
+     Extract ALL individual parts, fittings, fixings, materials, or tools into an "ADD_TO_SHED_STOCK" action with:
+     {
+       "merchant": "Merchant / Supplier Name (e.g. Screwfix)",
+       "orderNumber": "Order or invoice number if present",
+       "items": [
+         {
+           "name": "Clean, descriptive item name (e.g. '15mm Lever Ball Valve', 'Dulux Trade White Emulsion 5L', 'M8 Hex Bolts 50mm')",
+           "quantity": 1,
+           "unit": "units" | "pack" | "metres" | "rolls",
+           "category": "Materials" | "Tools" | "Fixings" | "Consumables" | "Other",
+           "unitPrice": 4.50,
+           "excluded": false
+         }
+       ],
+       "total": 0.00
+     }
+  3. SCHEDULED JOB / DIARY APPOINTMENT:
+     When the scribble details a confirmed appointment with date and time:
+     Return action: "CREATE_CALENDAR_EVENT" with:
+     { "title": "Job title - Client", "startTime": "ISO", "endTime": "ISO", "location": "Address", "description": "Scope" }
+  4. TASK / REMINDER:
+     For to-dos without fixed appointment times (e.g. 'Call Travis Perkins', 'Send invoice to Dave'):
+     Return action: "CREATE_TASK" with title, description, and dueDate (ISO string).
+  5. GENERAL NOTE:
+     For general site notes, access codes, paint codes, or reference info: Return action: "CREATE_NOTE" with title and content.
 
 Return JSON:
 {
   "actions": [{
-    "action": ${isBriefingContext ? '"CREATE_TASK"|"CREATE_NOTE"|"CREATE_SHOPPING_ITEM"|"CREATE_RECIPE"' : '"CREATE_TASK"|"CREATE_CALENDAR_EVENT"|"CREATE_NOTE"|"CREATE_SHOPPING_ITEM"|"CREATE_RECIPE"'},
-    "data": { "title": "...", "description": "...", "content": "...", "dueDate": "ISO", "startTime": "ISO", "endTime": "ISO", "location": "...", "category": "...", "name": "...", "ingredients": ["..."], "instructions": "...", "prepTime": "...", "servings": "..." }
+    "action": "CREATE_QUOTE"|"CREATE_TASK"|"CREATE_CALENDAR_EVENT"|"CREATE_NOTE"|"CREATE_SHOPPING_ITEM"|"ADD_TO_SHED_STOCK"|"CREATE_RECIPE",
+    "data": { 
+      "title": "...", 
+      "description": "...", 
+      "content": "...", 
+      "dueDate": "ISO", 
+      "startTime": "ISO", 
+      "endTime": "ISO", 
+      "location": "...", 
+      "category": "...", 
+      "name": "...", 
+      "customerName": "...", 
+      "jobTitle": "...", 
+      "items": [], 
+      "grandTotal": 0 
+    }
   }],
-  "summary": "Brief summary"
+  "summary": "Brief summary of what was extracted from the notes"
 }`;
 
   return withSilentRetry(async () => {
@@ -152,8 +256,7 @@ Return JSON:
       model: FLASH_3_1_LITE,
       systemInstruction,
       generationConfig: {
-        responseMimeType: "application/json",
-        thinkingConfig: { thinkingBudget: 1024 }
+        responseMimeType: "application/json"
       }
     });
 
@@ -173,7 +276,12 @@ Return JSON:
 export async function processSmartConvert(content: string, members: any[] = [], forecast: any[] = []) {
   const user = auth.currentUser;
   if (user) {
-    await incrementSmartConvertUsage(user.uid);
+    try {
+      await incrementSmartConvertUsage(user.uid);
+    } catch (e: any) {
+      if (e?.message === 'LIMIT_EXCEEDED') throw e;
+      logger.warn('Usage counter increment failed:', e);
+    }
   }
 
   const parts = [
@@ -199,7 +307,16 @@ RULES:
   - 🔗 **Tickets/Website:** [URL]
 - ASSIGNMENT: Identify who the task or event is likely for. PRIORITIZE Active Members for immediate tasks.
 - FORMATTING: Use bold section headers (e.g. **What's On:**) and START A NEW LINE for every section. Use bullet points for details.
-- ACTIONS: If the content describes a new scheduled event with a confirmed location, include a CREATE_CALENDAR_EVENT action. If converting an existing event or note that already describes a scheduled event, or if location is missing, omit CREATE_CALENDAR_EVENT and output only preparation tasks.
+- ACTIONS:
+  * If the content describes a new scheduled event with a confirmed location, include a CREATE_CALENDAR_EVENT action.
+  * TRADE ORDERS, RECEIPTS & PARTS (ASSIGN TO THE SHED): If the notes, email, or text contain an order confirmation, till receipt, invoice, or parts list from a trade merchant (e.g. Screwfix, Toolstation, Travis Perkins, Selco), include an action 'ADD_TO_SHED_STOCK' with data:
+    {
+      "merchant": "Merchant Name (e.g. Screwfix)",
+      "orderNumber": "Order or invoice number if present",
+      "items": [
+        { "name": "Clean item description", "quantity": 1, "unit": "units" | "pack", "category": "Materials" | "Tools" | "Fixings", "unitPrice": 0.00, "excluded": false }
+      ]
+    }
 - PREP TASKS & RSVPS:
   * For RSVP tasks: ALWAYS schedule the CREATE_TASK for 7 days AFTER today (${new Date().toLocaleString('en-GB')}) - exactly 1 week after invite detection.
   * For Birthday or Anniversary parties: ALWAYS include a CREATE_TASK titled "Buy birthday gift for [Name]" (or "Buy gift for [Name]") scheduled for 7 days BEFORE the actual event date (or TODAY if the event date is less than 7 days away - NEVER schedule in the past).
@@ -214,14 +331,16 @@ Return JSON:
   "replyDraft": "Optional friendly reply to the invite",
   "actions": [
     {
-      "action": "CREATE_TASK"|"CREATE_CALENDAR_EVENT"|"CREATE_SHOPPING_ITEM",
+      "action": "CREATE_TASK"|"CREATE_CALENDAR_EVENT"|"CREATE_SHOPPING_ITEM"|"ADD_TO_SHED_STOCK",
       "data": { 
         "title": "...", 
         "description": "...", 
         "dueDate": "ISO", 
         "startTime": "ISO", 
         "location": "...",
-        "assignedTo": "Member Name or ID from the list, or 'all'"
+        "assignedTo": "Member Name or ID from the list, or 'all'",
+        "merchant": "...",
+        "items": []
       }
     }
   ]
@@ -237,8 +356,7 @@ IMPORTANT:
     const model = getGenerativeModel(googleAI, { 
       model: FLASH_3_1_LITE,
       generationConfig: { 
-        responseMimeType: "application/json",
-        thinkingConfig: { thinkingBudget: 1024 }
+        responseMimeType: "application/json"
       }
     });
 

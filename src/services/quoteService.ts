@@ -69,7 +69,8 @@ export function subscribeBusinessDetails(
         sortCode: data.sortCode || '',
         accountNumber: data.accountNumber || '',
         defaultPaymentTerms: data.defaultPaymentTerms || DEFAULT_BUSINESS_DETAILS.defaultPaymentTerms,
-        defaultQuoteTerms: data.defaultQuoteTerms || DEFAULT_BUSINESS_DETAILS.defaultQuoteTerms
+        defaultQuoteTerms: data.defaultQuoteTerms || DEFAULT_BUSINESS_DETAILS.defaultQuoteTerms,
+        vehicles: data.vehicles || []
       });
     } else {
       callback(DEFAULT_BUSINESS_DETAILS);
@@ -123,15 +124,18 @@ export async function saveQuote(
   const id = quote.id || doc(quotesRef).id;
   const quoteDoc = doc(quotesRef, id);
 
-  const cleanData: any = {
+  const rawData: any = {
     ...quote,
     id,
     updatedAt: new Date().toISOString()
   };
 
   if (!quote.createdAt) {
-    cleanData.createdAt = new Date().toISOString();
+    rawData.createdAt = new Date().toISOString();
   }
+
+  // Remove undefined fields and nested undefined keys from items
+  const cleanData: any = JSON.parse(JSON.stringify(rawData, (key, value) => value === undefined ? null : value));
 
   await setDoc(quoteDoc, cleanData, { merge: true });
 

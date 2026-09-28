@@ -39,15 +39,23 @@ export function useSubscriptionTier(): SubscriptionStatus {
     let unsubFamily: (() => void) | null = null;
     let unsubBilling: (() => void) | null = null;
 
+    let currentUserTier = 'free';
+    let currentFamTier = 'free';
+    let currentBillingTier = 'free';
+    let currentBeta = false;
+    let currentTEnds: Date | null = null;
+
     const evalTier = (
       userTierVal: string, 
       famTierVal: string, 
+      billingTierVal: string,
       betaVal: boolean, 
       tEndsVal: Date | null
     ) => {
       setIsBetaTester(betaVal);
 
-      if (userTierVal === 'premium' || famTierVal === 'premium' || betaVal) {
+      // If user, trade profile, billing, or beta tester is premium, they are NOT on trial
+      if (userTierVal === 'premium' || famTierVal === 'premium' || billingTierVal === 'premium' || betaVal) {
         setSubscriptionTier('premium');
         setIsTrial(false);
         setTrialDaysRemaining(0);
@@ -67,15 +75,13 @@ export function useSubscriptionTier(): SubscriptionStatus {
       }
     };
 
-    let currentUserTier = 'free';
-    let currentFamTier = 'free';
-    let currentBeta = false;
-    let currentTEnds: Date | null = null;
-
     unsubBilling = onSnapshot(billingRef, (bSnap) => {
       if (bSnap.exists()) {
         const bData = bSnap.data();
         if (bData.isBetaTester === true) currentBeta = true;
+        if (bData.subscriptionTier === 'premium' || bData.status === 'active') {
+          currentBillingTier = 'premium';
+        }
 
         if (bData.trialEndsAt) {
           const raw = bData.trialEndsAt;
@@ -83,14 +89,14 @@ export function useSubscriptionTier(): SubscriptionStatus {
           setTrialEndsAt(currentTEnds);
         }
       }
-      evalTier(currentUserTier, currentFamTier, currentBeta, currentTEnds);
+      evalTier(currentUserTier, currentFamTier, currentBillingTier, currentBeta, currentTEnds);
     }, () => {});
 
     const unsubUser = onSnapshot(userRef, (snap) => {
       if (snap.exists()) {
         const userData = snap.data();
         currentUserTier = userData.subscriptionTier || 'free';
-        const fid = userData.tradeUserId;
+        const fid = userData.tradeUserId || `trade_${user.uid}`;
         
         if (fid) {
           if (unsubFamily) unsubFamily();
@@ -107,19 +113,38 @@ export function useSubscriptionTier(): SubscriptionStatus {
               }
               if (fData.isBetaTester === true) currentBeta = true;
             }
-            evalTier(currentUserTier, currentFamTier, currentBeta, currentTEnds);
+            evalTier(currentUserTier, currentFamTier, currentBillingTier, currentBeta, currentTEnds);
             setLoading(false);
           }, (err) => {
-            console.error('Error listening to family sub tier', err);
-            evalTier(currentUserTier, currentFamTier, currentBeta, currentTEnds);
+            console.error('Error listening to trade user sub tier', err);
+            evalTier(currentUserTier, currentFamTier, currentBillingTier, currentBeta, currentTEnds);
             setLoading(false);
           });
         } else {
-          evalTier(currentUserTier, currentFamTier, currentBeta, currentTEnds);
+          evalTier(currentUserTier, currentFamTier, currentBillingTier, currentBeta, currentTEnds);
           setLoading(false);
         }
       } else {
-        setLoading(false);
+        // Fallback check trade_${user.uid} directly
+        const fallbackFid = `trade_${user.uid}`;
+        if (unsubFamily) unsubFamily();
+        unsubFamily = onSnapshot(doc(db, 'trade_users', fallbackFid), (famSnap) => {
+          if (famSnap.exists()) {
+            const fData = famSnap.data();
+            currentFamTier = fData.subscriptionTier || 'free';
+            setCancelAtPeriodEnd(Boolean(fData.cancelAtPeriodEnd));
+            if (fData.currentPeriodEnd) {
+              const rawEnd = fData.currentPeriodEnd;
+              setCurrentPeriodEnd(typeof rawEnd.toDate === 'function' ? rawEnd.toDate() : new Date(rawEnd));
+            }
+            if (fData.isBetaTester === true) currentBeta = true;
+          }
+          evalTier(currentUserTier, currentFamTier, currentBillingTier, currentBeta, currentTEnds);
+          setLoading(false);
+        }, () => {
+          evalTier(currentUserTier, currentFamTier, currentBillingTier, currentBeta, currentTEnds);
+          setLoading(false);
+        });
       }
     }, (err) => {
       console.error('Error listening to user sub tier', err);

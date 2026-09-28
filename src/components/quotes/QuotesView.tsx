@@ -21,7 +21,10 @@ import {
   SlidersHorizontal, 
   ChevronDown,
   Sparkles,
-  ArrowRight
+  ArrowRight,
+  RotateCcw,
+  ShieldAlert,
+  Send
 } from 'lucide-react';
 import { Quote, Invoice, BusinessDetails, DEFAULT_BUSINESS_DETAILS } from '../../types/quote';
 import { 
@@ -38,7 +41,9 @@ import {
   deleteInvoice, 
   updateInvoiceStatus, 
   generateNextInvoiceNumber, 
-  convertQuoteToInvoice 
+  convertQuoteToInvoice,
+  revertInvoiceToQuote,
+  generateInvoiceSummaryCsv
 } from '../../services/invoiceService';
 import { 
   formatCurrency, 
@@ -63,7 +68,7 @@ export default function QuotesView() {
 
   // Quotes state
   const [quotes, setQuotes] = useState<Quote[]>([]);
-  const [filterQuoteStatus, setFilterQuoteStatus] = useState<'all' | Quote['status']>('all');
+  const [filterQuoteStatus, setFilterQuoteStatus] = useState<'all' | Quote['status'] | 'converted'>('all');
 
   // Invoices state
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -89,6 +94,15 @@ export default function QuotesView() {
   // Accepted Quote Smart Convert Modal
   const [isAcceptanceModalOpen, setIsAcceptanceModalOpen] = useState(false);
   const [acceptedQuoteForModal, setAcceptedQuoteForModal] = useState<Quote | null>(null);
+
+  // Revert Invoice Confirmation
+  const [revertInvoiceConfig, setRevertInvoiceConfig] = useState<{
+    isOpen: boolean;
+    invoice: Invoice | null;
+  }>({
+    isOpen: false,
+    invoice: null
+  });
 
   // Delete Confirmation Modal
   const [confirmDeleteConfig, setConfirmDeleteConfig] = useState<{
@@ -152,14 +166,21 @@ export default function QuotesView() {
   const query = searchQuery.toLowerCase().trim();
 
   const filteredQuotes = quotes.filter(q => {
-    const matchesStatus = filterQuoteStatus === 'all' || q.status === filterQuoteStatus;
+    const isConverted = !!q.invoiceId;
+    if (filterQuoteStatus === 'converted') {
+      if (!isConverted) return false;
+    } else {
+      if (isConverted) return false; // Quote disappears when converted to invoice
+      if (filterQuoteStatus !== 'all' && q.status !== filterQuoteStatus) return false;
+    }
+
     const matchesSearch = !query || 
       q.quoteNumber?.toLowerCase().includes(query) ||
       q.customerName?.toLowerCase().includes(query) ||
       q.jobTitle?.toLowerCase().includes(query) ||
       q.customerAddress?.toLowerCase().includes(query);
 
-    return matchesStatus && matchesSearch;
+    return matchesSearch;
   });
 
   const filteredInvoices = invoices.filter(inv => {
@@ -344,6 +365,28 @@ export default function QuotesView() {
     }
   };
 
+  const handleRevertInvoice = async () => {
+    if (!activeTradeUserId || !revertInvoiceConfig.invoice) return;
+    try {
+      await revertInvoiceToQuote(activeTradeUserId, revertInvoiceConfig.invoice);
+      showToast(`Reverted invoice ${revertInvoiceConfig.invoice.invoiceNumber} back to active quote`, 'success');
+      setActiveTab('quotes');
+    } catch (err: any) {
+      showToast('Failed to revert invoice: ' + err.message, 'error');
+    } finally {
+      setRevertInvoiceConfig({ isOpen: false, invoice: null });
+    }
+  };
+
+  const handleExportInvoicesCsv = () => {
+    try {
+      generateInvoiceSummaryCsv(invoices);
+      showToast('Downloaded invoice summary CSV for accounting / Xero', 'success');
+    } catch (err: any) {
+      showToast('Failed to export CSV: ' + err.message, 'error');
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto pb-32 px-2 sm:px-4 space-y-4 sm:space-y-6">
       {/* Page Header with Segmented Toggle for Quotes & Invoices */}
@@ -458,7 +501,7 @@ export default function QuotesView() {
         {/* Status Filter Tabs - Compact on mobile */}
         <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
           {activeTab === 'quotes' ? (
-            (['all', 'draft', 'pending', 'accepted', 'declined'] as const).map(tab => (
+            (['all', 'draft', 'sent', 'pending', 'accepted', 'declined', 'converted'] as const).map(tab => (
               <button
                 key={tab}
                 onClick={() => setFilterQuoteStatus(tab)}
@@ -468,11 +511,11 @@ export default function QuotesView() {
                     : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'
                 }`}
               >
-                {tab === 'pending' ? 'Pending' : tab}
+                {tab === 'converted' ? 'Converted to Invoice' : tab}
               </button>
             ))
           ) : (
-            (['all', 'draft', 'sent', 'paid', 'overdue'] as const).map(tab => (
+            (['all', 'draft', 'sent', 'completed', 'paid', 'overdue'] as const).map(tab => (
               <button
                 key={tab}
                 onClick={() => setFilterInvoiceStatus(tab)}
@@ -488,14 +531,29 @@ export default function QuotesView() {
           )}
         </div>
 
-        {/* New Item Button */}
-        <button
-          onClick={activeTab === 'quotes' ? handleCreateNewQuote : handleCreateNewInvoice}
-          className="px-3.5 py-1.5 sm:py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95 shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          <span>{activeTab === 'quotes' ? 'New Quote' : 'New Invoice'}</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Export Invoices CSV button */}
+          {activeTab === 'invoices' && invoices.length > 0 && (
+            <button
+              onClick={handleExportInvoicesCsv}
+              className="px-3 py-1.5 sm:py-2 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 shrink-0 border border-zinc-200 dark:border-zinc-700"
+              title="Export CSV for Xero or your accountant"
+            >
+              <Download className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span className="hidden sm:inline">Export Invoices (CSV)</span>
+              <span className="sm:hidden">CSV</span>
+            </button>
+          )}
+
+          {/* New Item Button */}
+          <button
+            onClick={activeTab === 'quotes' ? handleCreateNewQuote : handleCreateNewInvoice}
+            className="px-3.5 py-1.5 sm:py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95 shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            <span>{activeTab === 'quotes' ? 'New Quote' : 'New Invoice'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Main List: Quotes or Invoices */}
@@ -529,6 +587,7 @@ export default function QuotesView() {
             {filteredQuotes.map(quote => {
               const isAccepted = quote.status === 'accepted';
               const isPending = quote.status === 'pending';
+              const isSent = quote.status === 'sent';
               const isDeclined = quote.status === 'declined';
 
               return (
@@ -577,6 +636,8 @@ export default function QuotesView() {
                           className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border outline-none cursor-pointer appearance-none pr-4 capitalize ${
                             isAccepted
                               ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-400 dark:border-emerald-800'
+                              : isSent
+                              ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-400 dark:border-blue-800'
                               : isPending
                               ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/60 dark:text-amber-400 dark:border-amber-800'
                               : isDeclined
@@ -585,6 +646,7 @@ export default function QuotesView() {
                           }`}
                         >
                           <option value="draft">Draft</option>
+                          <option value="sent">Sent</option>
                           <option value="pending">Pending</option>
                           <option value="accepted">Accepted</option>
                           <option value="declined">Declined</option>
@@ -732,7 +794,9 @@ export default function QuotesView() {
                           value={invoice.status}
                           onChange={e => handleInvoiceStatusChange(invoice.id, e.target.value as Invoice['status'])}
                           className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border outline-none cursor-pointer appearance-none pr-4 capitalize ${
-                            isPaid
+                            invoice.status === 'completed'
+                              ? 'bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/60 dark:text-teal-400 dark:border-teal-800'
+                              : isPaid
                               ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-400 dark:border-emerald-800'
                               : isSent
                               ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-400 dark:border-blue-800'
@@ -743,6 +807,7 @@ export default function QuotesView() {
                         >
                           <option value="draft">Draft</option>
                           <option value="sent">Sent</option>
+                          <option value="completed">Completed</option>
                           <option value="paid">Paid</option>
                           <option value="overdue">Overdue</option>
                         </select>
@@ -784,6 +849,16 @@ export default function QuotesView() {
                         <Edit3 className="w-3.5 h-3.5" />
                       </button>
 
+                      {invoice.quoteId && (
+                        <button
+                          onClick={() => setRevertInvoiceConfig({ isOpen: true, invoice })}
+                          className="p-1.5 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/50 text-amber-600 dark:text-amber-400 border border-amber-200/60 dark:border-amber-900/40 rounded-lg transition-all active:scale-95"
+                          title="Revert back to Quote"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+
                       <button
                         onClick={() => setConfirmDeleteConfig({
                           isOpen: true,
@@ -804,6 +879,21 @@ export default function QuotesView() {
           </div>
         )
       )}
+
+      {/* Footer Disclaimer: Financial Notice */}
+      <div className="pt-6 mt-8 border-t border-zinc-200/80 dark:border-zinc-800/80">
+        <div className="p-3.5 sm:p-4 bg-zinc-50 dark:bg-zinc-900/60 rounded-2xl border border-zinc-200 dark:border-zinc-800/80 flex items-start gap-3">
+          <ShieldAlert className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+          <div className="space-y-0.5 text-xs text-zinc-600 dark:text-zinc-400">
+            <p className="font-semibold text-zinc-900 dark:text-zinc-200">
+              Important Financial Notice
+            </p>
+            <p className="text-[11px] leading-relaxed">
+              TribeTrade is an AI trade assistant and productivity tool, not a certified accountant or registered tax adviser. All figures, VAT calculations, CIS deductions, and invoice totals must be reviewed and verified by you or your accountant before submission to HMRC or clients.
+            </p>
+          </div>
+        </div>
+      </div>
 
       {/* Quote Editor Modal */}
       <QuoteEditorModal
@@ -862,6 +952,10 @@ export default function QuotesView() {
         businessDetails={businessDetails}
         onEdit={handleEditInvoice}
         onStatusChange={handleInvoiceStatusChange}
+        onRevertToQuote={(inv) => {
+          setIsInvoicePreviewOpen(false);
+          setRevertInvoiceConfig({ isOpen: true, invoice: inv });
+        }}
       />
 
       {/* Quote Acceptance Smart Convert Modal */}
@@ -890,6 +984,17 @@ export default function QuotesView() {
         variant="danger"
         onConfirm={handleDeleteConfirm}
         onClose={() => setConfirmDeleteConfig({ isOpen: false, type: 'quote', id: '', number: '' })}
+      />
+
+      {/* Confirm Revert Invoice to Quote Modal */}
+      <ConfirmModal
+        isOpen={revertInvoiceConfig.isOpen}
+        title="Revert Invoice to Quote"
+        message={`Are you sure you want to revert Invoice ${revertInvoiceConfig.invoice?.invoiceNumber} back to a quote? The invoice will be cancelled and the original quotation will be restored to your active quotes list.`}
+        confirmLabel="Revert to Quote"
+        variant="warning"
+        onConfirm={handleRevertInvoice}
+        onClose={() => setRevertInvoiceConfig({ isOpen: false, invoice: null })}
       />
     </div>
   );

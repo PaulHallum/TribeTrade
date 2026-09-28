@@ -178,6 +178,13 @@ export default function CalendarView({ initialEventId, onInitialItemHandled }: {
   const calendarDays = eachDayOfInterval({ start: startDate, end: endDate });
 
   useEffect(() => {
+    try {
+      sessionStorage.setItem('tribe_selected_calendar_date', selectedDate.toISOString());
+      window.dispatchEvent(new CustomEvent('tribe_calendar_date_change', { detail: { date: selectedDate.toISOString() } }));
+    } catch (e) {}
+  }, [selectedDate]);
+
+  useEffect(() => {
     const effectiveTradeUserId = tradeUserId || (user ? `trade_${user.uid}` : '');
     if (!effectiveTradeUserId) return;
 
@@ -445,33 +452,43 @@ export default function CalendarView({ initialEventId, onInitialItemHandled }: {
         title={format(currentDate, 'MMMM yyyy')}
         subtitle="Schedule & Trade Appointments"
         extra={
-          <div className="bg-gradient-to-r from-emerald-500/10 to-blue-500/10 border border-emerald-500/20 dark:border-emerald-400/10 p-1 rounded-2xl flex gap-1 items-center">
+          <div className="flex items-center gap-2">
             <button
-              onClick={() => handleShareWeeklySchedule('webshare')}
-              className="p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors text-slate-600 dark:text-slate-400"
-              title="Share Weekly Schedule"
+              onClick={() => setShowQuickAdd(true)}
+              className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95"
+              title={`Add Job or Appointment for ${format(selectedDate, 'do MMMM')}`}
             >
-              <Share2 size={18} />
+              <Plus size={16} />
+              <span className="hidden sm:inline">Add Job</span>
             </button>
-            <button
-              onClick={() => window.open('https://calendar.google.com', '_blank')}
-              className="p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors text-slate-600 dark:text-slate-400"
-              title="Open Google Calendar"
-            >
-              <ExternalLink size={18} />
-            </button>
-            <button
-              onClick={() => setCurrentDate(subMonths(currentDate, 1))}
-              className="p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors"
-            >
-              <ChevronLeft size={18} className="text-slate-600 dark:text-slate-400" />
-            </button>
-            <button
-              onClick={() => setCurrentDate(addMonths(currentDate, 1))}
-              className="p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors"
-            >
-              <ChevronRight size={18} className="text-slate-600 dark:text-slate-400" />
-            </button>
+            <div className="bg-gradient-to-r from-emerald-500/10 to-blue-500/10 border border-emerald-500/20 dark:border-emerald-400/10 p-1 rounded-2xl flex gap-1 items-center">
+              <button
+                onClick={() => handleShareWeeklySchedule('webshare')}
+                className="p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors text-slate-600 dark:text-slate-400"
+                title="Share Weekly Schedule"
+              >
+                <Share2 size={18} />
+              </button>
+              <button
+                onClick={() => window.open('https://calendar.google.com', '_blank')}
+                className="p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors text-slate-600 dark:text-slate-400"
+                title="Open Google Calendar"
+              >
+                <ExternalLink size={18} />
+              </button>
+              <button
+                onClick={() => setCurrentDate(subMonths(currentDate, 1))}
+                className="p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors"
+              >
+                <ChevronLeft size={18} className="text-slate-600 dark:text-slate-400" />
+              </button>
+              <button
+                onClick={() => setCurrentDate(addMonths(currentDate, 1))}
+                className="p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors"
+              >
+                <ChevronRight size={18} className="text-slate-600 dark:text-slate-400" />
+              </button>
+            </div>
           </div>
         }
       />
