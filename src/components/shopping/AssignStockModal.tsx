@@ -46,7 +46,7 @@ export default function AssignStockModal({
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const availableStock = Math.max(0, Number(item?.quantity) || 0);
+  const availableStock = Math.max(0, (Number(item?.quantity) || 0) - (Number(item?.reservedQuantity) || 0));
 
   // Reset and fetch invoices on open
   useEffect(() => {

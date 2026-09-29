@@ -16,9 +16,13 @@ import {
   Navigation,
   PoundSterling,
   Building,
+  FileText,
   Route
 } from 'lucide-react';
 import { MileageEntry, HMRC_STANDARD_MILEAGE_RATE, Vehicle } from '../../types/vehicle';
+import { Invoice, Quote } from '../../types/quote';
+import { subscribeInvoices } from '../../services/invoiceService';
+import { subscribeQuotes } from '../../services/quoteService';
 import { 
   subscribeMileageEntries, 
   saveMileageEntry, 
@@ -30,7 +34,7 @@ import { useToast } from '../../contexts/ToastContext';
 import ConfirmModal from '../common/ConfirmModal';
 import { db } from '../../lib/firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
-import { calculateDrivingDistance } from '../../services/routeService';
+import { calculateDrivingDistance, geocodeUkAddress, extractUkPostcode } from '../../services/routeService';
 
 interface MileageLogModalProps {
   isOpen: boolean;
@@ -91,6 +95,12 @@ export default function MileageLogModal({
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // Invoices & Quotes for pulling client address & job details
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [showInvoicePicker, setShowInvoicePicker] = useState(false);
+  const [linkedJobId, setLinkedJobId] = useState<string | undefined>(initialJobContext?.jobId);
+
   // Delete modal state
   const [deleteConfig, setDeleteConfig] = useState<{
     isOpen: boolean;
@@ -113,6 +123,21 @@ export default function MileageLogModal({
     });
 
     return () => unsub();
+  }, [isOpen, tradeUserId]);
+
+  // Subscribe to real-time invoices & quotes for address and job details lookup
+  useEffect(() => {
+    if (!isOpen || !tradeUserId) return;
+    const unsubInvoices = subscribeInvoices(tradeUserId, (list) => {
+      setInvoices(list);
+    });
+    const unsubQuotes = subscribeQuotes(tradeUserId, (qList) => {
+      setQuotes(qList);
+    });
+    return () => {
+      unsubInvoices();
+      unsubQuotes();
+    };
   }, [isOpen, tradeUserId]);
 
   // Subscribe to registered vehicles & business base address from profile
@@ -218,6 +243,85 @@ export default function MileageLogModal({
     }
   };
 
+  const handleSelectInvoice = (inv: Invoice) => {
+    const rawInv = inv as any;
+
+    // 1. Gather all address parts from invoice
+    let rawAddress = (rawInv.customerAddress || rawInv.siteAddress || rawInv.location || '').trim();
+
+    // If invoice is linked to a quote, check if source quote has fuller address or postcode
+    if (inv.quoteId && quotes.length > 0) {
+      const linkedQuote = quotes.find(q => q.id === inv.quoteId || q.quoteNumber === inv.quoteNumber);
+      if (linkedQuote) {
+        const qRaw = ((linkedQuote as any).customerAddress || (linkedQuote as any).siteAddress || '').trim();
+        if (extractUkPostcode(qRaw) && !extractUkPostcode(rawAddress)) {
+          rawAddress = qRaw;
+        } else if (qRaw.length > rawAddress.length) {
+          rawAddress = qRaw;
+        }
+      }
+    }
+
+    // Replace linebreaks (\r\n) with commas so the full multi-line address fits in the input without truncation
+    let fullAddress = rawAddress.replace(/[\r\n]+/g, ', ').replace(/,\s*,/g, ',').trim();
+
+    // Check if distinct address lines / postcode fields exist on invoice document
+    const extraParts = [
+      rawInv.addressLine1,
+      rawInv.addressLine2,
+      rawInv.townCity || rawInv.city,
+      rawInv.county,
+      rawInv.customerPostcode || rawInv.postcode || rawInv.sitePostcode || rawInv.zip
+    ].filter(Boolean).map((s: string) => String(s).trim());
+
+    if (extraParts.length > 0) {
+      for (const part of extraParts) {
+        if (!fullAddress.toLowerCase().includes(part.toLowerCase())) {
+          fullAddress = fullAddress ? `${fullAddress}, ${part}` : part;
+        }
+      }
+    }
+
+    if (fullAddress) {
+      setDestination(fullAddress);
+
+      // If the address doesn't contain a postcode, automatically resolve the UK postcode via geocoder
+      if (!extractUkPostcode(fullAddress)) {
+        geocodeUkAddress(fullAddress).then(geo => {
+          if (geo?.postcode) {
+            setDestination(prev => {
+              if (!extractUkPostcode(prev)) {
+                return `${prev}, ${geo.postcode}`;
+              }
+              return prev;
+            });
+          }
+        }).catch(() => {});
+      }
+    } else {
+      showToast(`Invoice ${inv.invoiceNumber} has no client address recorded`, 'warning');
+    }
+
+    // 2. Purpose & Reason
+    const generatedPurpose = inv.jobTitle 
+      ? `${inv.jobTitle} - ${inv.customerName}` 
+      : `Site visit - ${inv.customerName || 'Client'} (${inv.invoiceNumber})`;
+    setPurpose(generatedPurpose);
+
+    // 3. Job / Quote Ref
+    const refText = inv.jobTitle ? `${inv.jobTitle} (${inv.invoiceNumber})` : inv.invoiceNumber;
+    setJobTitle(refText);
+    setLinkedJobId(inv.id);
+
+    // 4. Job Description into Notes
+    if (!notes.trim() && inv.jobDescription) {
+      setNotes(inv.jobDescription);
+    }
+
+    setShowInvoicePicker(false);
+    showToast(`Pulled details from ${inv.invoiceNumber} (${inv.customerName})`, 'success');
+  };
+
   const handleEdit = (entry: MileageEntry) => {
     setEditingEntryId(entry.id);
     setDate(entry.date);
@@ -228,6 +332,7 @@ export default function MileageLogModal({
     setStartLocation(entry.startLocation || '');
     setDestination(entry.destination || '');
     setJobTitle(entry.jobTitle || '');
+    setLinkedJobId(entry.jobId || undefined);
     setMiles(String(entry.miles));
     setRatePerMile(entry.ratePerMile || HMRC_STANDARD_MILEAGE_RATE);
     setStartOdometer(entry.startOdometer !== undefined ? String(entry.startOdometer) : '');
@@ -243,6 +348,8 @@ export default function MileageLogModal({
     setStartLocation(baseAddress || 'Base / Workshop');
     setDestination(initialJobContext?.customerAddress || '');
     setJobTitle(initialJobContext?.jobTitle || '');
+    setLinkedJobId(initialJobContext?.jobId);
+    setShowInvoicePicker(false);
     setMiles('');
     setStartOdometer('');
     setEndOdometer('');
@@ -276,7 +383,7 @@ export default function MileageLogModal({
         purpose: purpose.trim(),
         startLocation: startLocation.trim(),
         destination: destination.trim(),
-        jobId: initialJobContext?.jobId,
+        jobId: linkedJobId || initialJobContext?.jobId,
         jobTitle: jobTitle.trim() || undefined,
         miles: milesNum,
         ratePerMile,
@@ -367,38 +474,30 @@ export default function MileageLogModal({
 
         {/* Scrollable Body */}
         <div className="p-4 sm:p-6 overflow-y-auto space-y-4">
-          {/* Statutory Financial Notice */}
-          <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-start gap-2.5 text-xs text-amber-800 dark:text-amber-300">
-            <ShieldAlert className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
-            <div className="leading-relaxed">
-              <strong className="font-bold">AI Assistant Financial Disclaimer:</strong> TribeTrade is a trade productivity assistant, not a chartered accountant or registered tax adviser. HMRC simplified vehicle expenses allow 45p per business mile up to 10,000 miles (25p thereafter) when using your own vehicle. All travel logs and claims must be checked with your accountant before filing.
-            </div>
-          </div>
-
           {/* Metric Cards Banner */}
           <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
             <div className="p-3 sm:p-4 bg-zinc-50 dark:bg-zinc-800/40 rounded-2xl border border-zinc-100 dark:border-zinc-800">
-              <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400 block truncate">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block truncate">
                 Total Business Miles
               </span>
-              <div className="text-base sm:text-xl font-black text-zinc-900 dark:text-white mt-0.5">
+              <div className="text-base sm:text-xl font-bold text-zinc-900 dark:text-white mt-0.5">
                 {totalMiles.toFixed(1)} <span className="text-xs font-normal text-zinc-500">mi</span>
               </div>
               <p className="text-[10px] text-zinc-400 mt-0.5">{entries.length} trips logged</p>
             </div>
 
             <div className="p-3 sm:p-4 bg-emerald-50/60 dark:bg-emerald-950/20 rounded-2xl border border-emerald-200/50 dark:border-emerald-800/40">
-              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 block truncate">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 block truncate">
                 Allowable Tax Claim
               </span>
-              <div className="text-base sm:text-xl font-black text-emerald-600 dark:text-emerald-400 mt-0.5">
+              <div className="text-base sm:text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
                 {formatCurrency(totalTaxClaim)}
               </div>
               <p className="text-[10px] text-emerald-600/70 dark:text-emerald-400/70 mt-0.5">@ 45p per mile rate</p>
             </div>
 
             <div className="p-3 sm:p-4 bg-zinc-50 dark:bg-zinc-800/40 rounded-2xl border border-zinc-100 dark:border-zinc-800 flex flex-col justify-between">
-              <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400 block truncate">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block truncate">
                 Quick Actions
               </span>
               <div className="flex items-center gap-1.5 mt-1">
@@ -552,7 +651,44 @@ export default function MileageLogModal({
 
                 {/* Destination */}
                 <div>
-                  <label className="text-[10px] font-bold text-zinc-500 block mb-1">To / Client Site</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[10px] font-medium text-zinc-600 dark:text-zinc-400">To / Client Site</label>
+                    <button
+                      type="button"
+                      onClick={() => setShowInvoicePicker(prev => !prev)}
+                      className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold hover:underline flex items-center gap-1"
+                      title="Select an existing invoice to auto-fill client site address, purpose, and job ref"
+                    >
+                      <FileText className="w-2.5 h-2.5" />
+                      <span>{showInvoicePicker ? 'Close' : 'Pull from Invoice'}</span>
+                    </button>
+                  </div>
+                  {showInvoicePicker && (
+                    <div className="mb-2 p-2 bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 rounded-xl space-y-1 animate-in fade-in duration-150">
+                      <label className="text-[10px] font-semibold text-emerald-900 dark:text-emerald-300 block">
+                        Select Existing Invoice:
+                      </label>
+                      {invoices.length === 0 ? (
+                        <p className="text-[11px] text-zinc-500 italic py-0.5">No invoices found for this account.</p>
+                      ) : (
+                        <select
+                          defaultValue=""
+                          onChange={(e) => {
+                            const selected = invoices.find(i => i.id === e.target.value);
+                            if (selected) handleSelectInvoice(selected);
+                          }}
+                          className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                        >
+                          <option value="" disabled>Choose an invoice...</option>
+                          {invoices.map((inv) => (
+                            <option key={inv.id} value={inv.id}>
+                              {inv.invoiceNumber || 'INV'} • {inv.customerName || 'Client'}{inv.jobTitle ? ` — ${inv.jobTitle}` : ''}{inv.customerAddress ? ` (${inv.customerAddress})` : ' (No address)'}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                  )}
                   <input
                     type="text"
                     placeholder="e.g. 14 High St, Guildford GU1 3AA"
@@ -564,7 +700,7 @@ export default function MileageLogModal({
 
                 {/* Linked Job (Optional) */}
                 <div>
-                  <label className="text-[10px] font-bold text-zinc-500 block mb-1">Job / Quote Ref (Optional)</label>
+                  <label className="text-[10px] font-medium text-zinc-600 dark:text-zinc-400 block mb-1">Job / Quote Ref (Optional)</label>
                   <input
                     type="text"
                     placeholder="e.g. Bathroom Refurb or Q-1002"
@@ -613,7 +749,7 @@ export default function MileageLogModal({
               {/* Miles and Odometer Row */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-3 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-700/60">
                 <div>
-                  <label className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 block mb-1">
+                  <label className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 block mb-1">
                     Miles Driven *
                   </label>
                   <input
@@ -624,12 +760,12 @@ export default function MileageLogModal({
                     value={miles}
                     onChange={e => setMiles(e.target.value)}
                     required
-                    className="w-full px-3 py-1.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs font-bold text-zinc-900 dark:text-white"
+                    className="w-full px-3 py-1.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs font-medium text-zinc-900 dark:text-white"
                   />
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-bold text-zinc-500 block mb-1">Rate (£/mile)</label>
+                  <label className="text-[10px] font-medium text-zinc-500 block mb-1">Rate (£/mile)</label>
                   <input
                     type="number"
                     step="0.01"
@@ -715,22 +851,25 @@ export default function MileageLogModal({
             </div>
           ) : (
             <div className="space-y-2">
-              {filteredEntries.map(entry => (
+              {filteredEntries.map(entry => {
+                const [y, m, d] = (entry.date || '').split('-');
+                const ukDate = y && m && d ? `${d}/${m}/${y}` : entry.date;
+                return (
                 <div
                   key={entry.id}
                   className="p-3 bg-white dark:bg-zinc-800/60 rounded-2xl border border-zinc-200 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 hover:border-emerald-500/30 transition-all shadow-sm"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <span className="text-[11px] font-bold text-zinc-400 shrink-0">
-                        {entry.date}
+                      <span className="text-[11px] font-mono font-medium text-zinc-500 dark:text-zinc-400 shrink-0">
+                        {ukDate}
                       </span>
                       {entry.vehicleReg && (
-                        <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 uppercase shrink-0">
+                        <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 uppercase shrink-0">
                           {entry.vehicleReg}
                         </span>
                       )}
-                      <h4 className="text-xs font-bold text-zinc-900 dark:text-white truncate">
+                      <h4 className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 truncate">
                         {entry.purpose}
                       </h4>
                     </div>
@@ -757,10 +896,10 @@ export default function MileageLogModal({
                   {/* Right side: Miles, Claim & Actions */}
                   <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-zinc-100 dark:border-zinc-800">
                     <div className="text-left sm:text-right shrink-0">
-                      <div className="text-xs sm:text-sm font-black text-zinc-900 dark:text-white">
+                      <div className="text-xs sm:text-sm font-medium text-zinc-700 dark:text-zinc-300">
                         {entry.miles.toFixed(1)} miles
                       </div>
-                      <div className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                      <div className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
                         {formatCurrency(entry.totalClaim)} claim
                       </div>
                     </div>
@@ -787,9 +926,18 @@ export default function MileageLogModal({
                     </div>
                   </div>
                 </div>
-              ))}
+              );
+            })}
             </div>
           )}
+
+          {/* Statutory Financial Notice */}
+          <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-start gap-2.5 text-xs text-amber-800 dark:text-amber-300 mt-4">
+            <ShieldAlert className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+            <div className="leading-relaxed">
+              <strong className="font-bold">AI Assistant Financial Disclaimer:</strong> TribeTrade is a trade productivity assistant, not a chartered accountant or registered tax adviser. HMRC simplified vehicle expenses allow 45p per business mile up to 10,000 miles (25p thereafter) when using your own vehicle. All travel logs and claims must be checked with your accountant before filing.
+            </div>
+          </div>
         </div>
 
         {/* Footer */}

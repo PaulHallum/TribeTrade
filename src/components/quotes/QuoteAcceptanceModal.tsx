@@ -27,11 +27,14 @@ import { useAuth } from '../../App';
 import { useToast } from '../../contexts/ToastContext';
 import { detectCategory } from '../../lib/shoppingUtils';
 import { convertQuoteToInvoice } from '../../services/invoiceService';
+import { reserveShedStock } from '../../services/shedService';
 
 interface ShedStockItem {
   id: string;
   name: string;
   quantity: number;
+  reservedQuantity?: number;
+  isKeyItem?: boolean;
   category?: string;
   unit?: string;
 }
@@ -44,8 +47,13 @@ interface NeededItem {
   type: 'material' | 'hire' | 'tool' | 'other';
   inShed: boolean;
   shedQuantity?: number;
+  shedAvailableQuantity?: number;
+  shedReservedQuantity?: number;
+  reservedFromShed: number;
+  neededForShopping: number;
   shedUnit?: string;
   selectedForShopping: boolean;
+  matchedShedId?: string;
 }
 
 interface QuoteAcceptanceModalProps {
@@ -87,6 +95,10 @@ export default function QuoteAcceptanceModal({
   const [isAddingToShopping, setIsAddingToShopping] = useState(false);
   const [shoppingAdded, setShoppingAdded] = useState(false);
 
+  // Shed Reservation state
+  const [isReservingStock, setIsReservingStock] = useState(false);
+  const [isStockReserved, setIsStockReserved] = useState(false);
+
   // Invoice creation state
   const [isCreatingInvoice, setIsCreatingInvoice] = useState(false);
   const [createdInvoiceNumber, setCreatedInvoiceNumber] = useState<string | null>(null);
@@ -100,6 +112,7 @@ export default function QuoteAcceptanceModal({
     // Reset status flags
     setIsCalendarBooked(Boolean(quote.calendarEventId));
     setShoppingAdded(false);
+    setIsStockReserved(false);
     setCreatedInvoiceNumber(quote.invoiceId ? 'Converted' : null);
 
     // Initialise calendar fields
@@ -154,7 +167,35 @@ export default function QuoteAcceptanceModal({
               return lowerDesc.includes(shedName) || shedName.includes(lowerDesc);
             });
 
-            const inShed = Boolean(matchedShed && matchedShed.quantity > 0);
+            const reqQty = Math.max(0, Number(it.quantity) || 1);
+            let inShed = false;
+            let shedAvailable = 0;
+            let reservedFromShed = 0;
+            let neededForShopping = reqQty;
+            let selectedForShopping = true;
+
+            if (matchedShed) {
+              const shedTotal = Number(matchedShed.quantity) || 0;
+              const shedReserved = Number(matchedShed.reservedQuantity) || 0;
+              shedAvailable = Math.max(0, Number((shedTotal - shedReserved).toFixed(2)));
+
+              if (shedAvailable >= reqQty) {
+                inShed = true;
+                reservedFromShed = reqQty;
+                neededForShopping = 0;
+                selectedForShopping = false;
+              } else if (shedAvailable > 0) {
+                inShed = true;
+                reservedFromShed = shedAvailable;
+                neededForShopping = Number((reqQty - shedAvailable).toFixed(2));
+                selectedForShopping = true;
+              } else {
+                inShed = false;
+                reservedFromShed = 0;
+                neededForShopping = reqQty;
+                selectedForShopping = true;
+              }
+            }
 
             extracted.push({
               id: it.id,
@@ -164,8 +205,13 @@ export default function QuoteAcceptanceModal({
               type: it.type,
               inShed,
               shedQuantity: matchedShed?.quantity,
+              shedAvailableQuantity: shedAvailable,
+              shedReservedQuantity: matchedShed?.reservedQuantity,
+              reservedFromShed,
+              neededForShopping,
               shedUnit: matchedShed?.unit,
-              selectedForShopping: !inShed
+              selectedForShopping,
+              matchedShedId: matchedShed?.id
             });
           }
         });
@@ -201,7 +247,30 @@ export default function QuoteAcceptanceModal({
       return lowerName.includes(shedName) || shedName.includes(lowerName);
     });
 
-    const inShed = Boolean(matchedShed && matchedShed.quantity > 0);
+    const reqQty = 1;
+    let inShed = false;
+    let shedAvailable = 0;
+    let reservedFromShed = 0;
+    let neededForShopping = reqQty;
+    let selectedForShopping = true;
+
+    if (matchedShed) {
+      const shedTotal = Number(matchedShed.quantity) || 0;
+      const shedReserved = Number(matchedShed.reservedQuantity) || 0;
+      shedAvailable = Math.max(0, Number((shedTotal - shedReserved).toFixed(2)));
+
+      if (shedAvailable >= reqQty) {
+        inShed = true;
+        reservedFromShed = reqQty;
+        neededForShopping = 0;
+        selectedForShopping = false;
+      } else if (shedAvailable > 0) {
+        inShed = true;
+        reservedFromShed = shedAvailable;
+        neededForShopping = Number((reqQty - shedAvailable).toFixed(2));
+        selectedForShopping = true;
+      }
+    }
 
     const newItem: NeededItem = {
       id: 'custom_' + Date.now(),
@@ -210,8 +279,13 @@ export default function QuoteAcceptanceModal({
       type: 'material',
       inShed,
       shedQuantity: matchedShed?.quantity,
+      shedAvailableQuantity: shedAvailable,
+      shedReservedQuantity: matchedShed?.reservedQuantity,
+      reservedFromShed,
+      neededForShopping,
       shedUnit: matchedShed?.unit,
-      selectedForShopping: !inShed
+      selectedForShopping,
+      matchedShedId: matchedShed?.id
     };
 
     setNeededItems(prev => [...prev, newItem]);
@@ -253,12 +327,49 @@ export default function QuoteAcceptanceModal({
         updatedAt: new Date().toISOString()
       });
 
+      // Automatically reserve available Shed stock for this job if not already reserved
+      if (!isStockReserved) {
+        const toReserve = neededItems.filter(it => it.reservedFromShed > 0 && it.matchedShedId);
+        for (const resItem of toReserve) {
+          if (resItem.matchedShedId) {
+            await reserveShedStock(activeTradeUserId, resItem.matchedShedId, resItem.reservedFromShed);
+          }
+        }
+        if (toReserve.length > 0) {
+          setIsStockReserved(true);
+        }
+      }
+
       setIsCalendarBooked(true);
       showToast('Job booked into your calendar successfully', 'success');
     } catch (err: any) {
       showToast('Failed to book into calendar: ' + err.message, 'error');
     } finally {
       setIsBookingCalendar(false);
+    }
+  };
+
+  // Dedicated action to reserve available Shed stock for this quote
+  const handleReserveStock = async () => {
+    if (!activeTradeUserId || isStockReserved) return;
+    const toReserve = neededItems.filter(it => it.reservedFromShed > 0 && it.matchedShedId);
+    if (toReserve.length === 0) {
+      showToast('No Shed stock available to reserve for this quote', 'info');
+      return;
+    }
+    setIsReservingStock(true);
+    try {
+      for (const resItem of toReserve) {
+        if (resItem.matchedShedId) {
+          await reserveShedStock(activeTradeUserId, resItem.matchedShedId, resItem.reservedFromShed);
+        }
+      }
+      setIsStockReserved(true);
+      showToast(`Reserved ${toReserve.length} stock item(s) in The Shed for this job`, 'success');
+    } catch (err: any) {
+      showToast('Failed to reserve shed stock: ' + err.message, 'error');
+    } finally {
+      setIsReservingStock(false);
     }
   };
 
@@ -275,7 +386,8 @@ export default function QuoteAcceptanceModal({
     try {
       const shoppingRef = collection(db, 'trade_users', activeTradeUserId, 'shoppingList');
       for (const item of toAdd) {
-        const qtyLabel = item.unit ? `${item.quantity} ${item.unit}` : `${item.quantity}`;
+        const qtyToAdd = item.neededForShopping > 0 ? item.neededForShopping : (Number(item.quantity) || 1);
+        const qtyLabel = item.unit ? `${qtyToAdd} ${item.unit}` : `${qtyToAdd}`;
         await addDoc(shoppingRef, {
           name: item.name,
           quantity: qtyLabel,
@@ -498,22 +610,37 @@ export default function QuoteAcceptanceModal({
                         <span className="text-xs font-bold text-zinc-900 dark:text-white block truncate">
                           {item.name}
                         </span>
-                        <span className="text-[10px] text-zinc-400">
-                          Required: {item.quantity} {item.unit || ''}
-                        </span>
+                        <div className="text-[10px] text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5 flex-wrap">
+                          <span>Required: {item.quantity} {item.unit || ''}</span>
+                          {item.reservedFromShed > 0 && (
+                            <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                              • {item.reservedFromShed} reserved from Shed
+                            </span>
+                          )}
+                          {item.neededForShopping > 0 && item.reservedFromShed > 0 && (
+                            <span className="text-amber-600 dark:text-amber-400 font-semibold">
+                              • Need {item.neededForShopping} {item.unit || ''} more
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
-                      {item.inShed ? (
+                      {item.neededForShopping === 0 && item.reservedFromShed > 0 ? (
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                           <Warehouse className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
-                          <span>In Shed ({item.shedQuantity} {item.shedUnit || 'in stock'})</span>
+                          <span>All in Shed ({item.reservedFromShed} available)</span>
+                        </span>
+                      ) : item.reservedFromShed > 0 && item.neededForShopping > 0 ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-gradient-to-r from-emerald-100 to-amber-100 text-emerald-900 dark:from-emerald-950 dark:to-amber-950 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                          <Warehouse className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                          <span>Partial Shed ({item.reservedFromShed} in stock, {item.neededForShopping} to buy)</span>
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
                           <ShoppingCart className="w-3 h-3 text-amber-600 dark:text-amber-400" />
-                          <span>Needs Ordering</span>
+                          <span>Needs Ordering ({item.neededForShopping || item.quantity})</span>
                         </span>
                       )}
                     </div>
@@ -540,14 +667,37 @@ export default function QuoteAcceptanceModal({
               </button>
             </form>
 
-            <div className="pt-2 flex justify-between items-center">
-              <span className="text-[11px] text-zinc-500">
-                {neededItems.filter(it => it.selectedForShopping).length} item(s) selected for pick list
-              </span>
+            <div className="pt-2 flex flex-col sm:flex-row justify-between items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[11px] text-zinc-500">
+                  {neededItems.filter(it => it.selectedForShopping).length} item(s) selected for pick list
+                </span>
+                {neededItems.some(it => it.reservedFromShed > 0) && (
+                  <button
+                    type="button"
+                    onClick={handleReserveStock}
+                    disabled={isReservingStock || isStockReserved}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold inline-flex items-center gap-1 transition-all ${
+                      isStockReserved
+                        ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                        : 'bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-700 dark:hover:bg-zinc-600 text-zinc-800 dark:text-zinc-100'
+                    }`}
+                  >
+                    {isReservingStock ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : isStockReserved ? (
+                      <Check className="w-3 h-3 text-emerald-600" />
+                    ) : (
+                      <Warehouse className="w-3 h-3 text-blue-500" />
+                    )}
+                    <span>{isStockReserved ? 'Stock Reserved in Shed' : 'Reserve Available Shed Stock'}</span>
+                  </button>
+                )}
+              </div>
               <button
                 onClick={handleAddToShoppingList}
                 disabled={isAddingToShopping || shoppingAdded || neededItems.filter(it => it.selectedForShopping).length === 0}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-all shadow-sm"
+                className="w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-xl text-xs font-bold inline-flex items-center justify-center gap-1.5 transition-all shadow-sm"
               >
                 {isAddingToShopping ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />

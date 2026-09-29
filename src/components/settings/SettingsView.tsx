@@ -497,11 +497,11 @@ export default function SettingsView({
   const [savingBusinessDetails, setSavingBusinessDetails] = useState(false);
 
   const handleSaveBusinessDetails = async () => {
-    const tid = tradeUserId || `family_${user?.uid}`;
+    const tid = tradeUserId || (user ? `trade_${user.uid}` : '');
     if (!tid) return;
     setSavingBusinessDetails(true);
     try {
-      await setDoc(doc(db, 'trade_users', tid), {
+      const payload = {
         businessName: businessForm.businessName.trim(),
         tradingName: businessForm.tradingName?.trim() || '',
         addressLine1: businessForm.addressLine1?.trim() || '',
@@ -523,7 +523,11 @@ export default function SettingsView({
         accountNumber: businessForm.accountNumber?.trim() || '',
         defaultPaymentTerms: businessForm.defaultPaymentTerms?.trim() || '',
         defaultQuoteTerms: businessForm.defaultQuoteTerms?.trim() || ''
-      }, { merge: true });
+      };
+      await setDoc(doc(db, 'trade_users', tid), payload, { merge: true });
+      if (user && tid !== `family_${user.uid}`) {
+        await setDoc(doc(db, 'trade_users', `family_${user.uid}`), payload, { merge: true }).catch(() => {});
+      }
       showToast('Business details updated successfully', 'success');
       setOpenSections(prev => ({ ...prev, business: false }));
     } catch (err: any) {
@@ -680,10 +684,18 @@ export default function SettingsView({
       }
     });
 
-    const tid = tradeUserId || `family_${user.uid}`;
-    const unsubBusiness = onSnapshot(doc(db, 'trade_users', tid), (snap) => {
+    const tid = tradeUserId || (user ? `trade_${user.uid}` : '');
+    const unsubBusiness = onSnapshot(doc(db, 'trade_users', tid), async (snap) => {
+      let data: any = null;
       if (snap.exists()) {
-        const data = snap.data();
+        data = snap.data();
+      } else if (user && tid !== `family_${user.uid}`) {
+        const fallbackSnap = await getDoc(doc(db, 'trade_users', `family_${user.uid}`)).catch(() => null);
+        if (fallbackSnap && fallbackSnap.exists()) {
+          data = fallbackSnap.data();
+        }
+      }
+      if (data) {
         setBusinessForm({
           ...DEFAULT_BUSINESS_DETAILS,
           businessName: data.businessName || data.familyName || '',
@@ -1377,8 +1389,17 @@ export default function SettingsView({
                   type="number"
                   min="0"
                   max="100"
-                  value={businessForm.defaultVatRate ?? 20}
-                  onChange={e => setBusinessForm(prev => ({ ...prev, defaultVatRate: parseFloat(e.target.value) || 0 }))}
+                  value={businessForm.defaultVatRate === 0 ? '' : (businessForm.defaultVatRate ?? '')}
+                  onChange={e => {
+                    const val = e.target.value;
+                    setBusinessForm(prev => ({ ...prev, defaultVatRate: val === '' ? ('' as any) : parseFloat(val) || 0 }));
+                  }}
+                  onBlur={() => {
+                    if (businessForm.defaultVatRate === '' as any || businessForm.defaultVatRate === undefined) {
+                      setBusinessForm(prev => ({ ...prev, defaultVatRate: 20 }));
+                    }
+                  }}
+                  placeholder="20"
                   className="w-full px-3.5 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
@@ -1397,8 +1418,17 @@ export default function SettingsView({
                   type="number"
                   min="0"
                   step="1"
-                  value={businessForm.defaultHourlyRate ?? 45}
-                  onChange={e => setBusinessForm(prev => ({ ...prev, defaultHourlyRate: parseFloat(e.target.value) || 0 }))}
+                  value={businessForm.defaultHourlyRate === 0 ? '' : (businessForm.defaultHourlyRate ?? '')}
+                  onChange={e => {
+                    const val = e.target.value;
+                    setBusinessForm(prev => ({ ...prev, defaultHourlyRate: val === '' ? ('' as any) : parseFloat(val) || 0 }));
+                  }}
+                  onBlur={() => {
+                    if (!businessForm.defaultHourlyRate) {
+                      setBusinessForm(prev => ({ ...prev, defaultHourlyRate: 45 }));
+                    }
+                  }}
+                  placeholder="45"
                   className="w-full px-3.5 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
@@ -1408,8 +1438,17 @@ export default function SettingsView({
                   type="number"
                   min="0"
                   step="5"
-                  value={businessForm.defaultDayRate ?? 320}
-                  onChange={e => setBusinessForm(prev => ({ ...prev, defaultDayRate: parseFloat(e.target.value) || 0 }))}
+                  value={businessForm.defaultDayRate === 0 ? '' : (businessForm.defaultDayRate ?? '')}
+                  onChange={e => {
+                    const val = e.target.value;
+                    setBusinessForm(prev => ({ ...prev, defaultDayRate: val === '' ? ('' as any) : parseFloat(val) || 0 }));
+                  }}
+                  onBlur={() => {
+                    if (!businessForm.defaultDayRate) {
+                      setBusinessForm(prev => ({ ...prev, defaultDayRate: 320 }));
+                    }
+                  }}
+                  placeholder="320"
                   className="w-full px-3.5 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
@@ -1622,7 +1661,7 @@ export default function SettingsView({
                   <p className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate">
                     {settings.pinLock && settings.pinHash
                       ? 'Your 4-digit PIN protects your app screen'
-                      : 'Secure notes, calendar, & family data with a 4-digit PIN'}
+                      : 'Secure notes, calendar, & trade data with a 4-digit PIN'}
                   </p>
                 </div>
               </div>

@@ -92,9 +92,10 @@ export default function QuoteEditorModal({
       const mappedItems = (initialQuote.items || []).map(it => {
         if (it.type === 'labour') {
           const qty = it.quantity || 1;
-          const d = Math.floor(qty);
-          const h = Math.round((qty % 1) * 8);
-          return { ...it, days: (it as any).days ?? d, hours: (it as any).hours ?? h };
+          const isHourlyUnit = it.unit?.includes('hr') || it.unit?.includes('hour');
+          const d = (it as any).days ?? (isHourlyUnit ? 0 : Math.floor(qty));
+          const h = (it as any).hours ?? (isHourlyUnit ? qty : Math.round((qty % 1) * 8));
+          return { ...it, days: d, hours: h };
         }
         return it;
       });
@@ -139,17 +140,21 @@ export default function QuoteEditorModal({
   const grandTotal = Number((netTotal + vatAmount).toFixed(2));
 
   // Item helpers
-  const handleAddItem = (type: QuoteItem['type'] = 'labour') => {
+  const handleAddItem = (type: QuoteItem['type'] = 'labour', labourMode: 'day' | 'hour' = 'day') => {
     const isLabour = type === 'labour';
-    const rate = isLabour ? (businessDetails.defaultDayRate || 320) : 0;
+    const isHourly = isLabour && labourMode === 'hour';
+    const defaultRate = isHourly
+      ? (businessDetails.defaultHourlyRate ?? 45)
+      : (businessDetails.defaultDayRate ?? 320);
+    const rate = isLabour ? defaultRate : 0;
     const newItem: QuoteItem & { days?: number; hours?: number } = {
       id: Date.now().toString(),
-      description: isLabour ? 'Trade Labour' : '',
+      description: isLabour ? (isHourly ? 'Trade Labour (Hourly)' : 'Trade Labour') : '',
       type,
-      days: isLabour ? 1 : undefined,
-      hours: isLabour ? 0 : undefined,
+      days: isLabour ? (isHourly ? 0 : 1) : undefined,
+      hours: isLabour ? (isHourly ? 1 : 0) : undefined,
       quantity: 1,
-      unit: isLabour ? '1 day' : 'units',
+      unit: isLabour ? (isHourly ? '1 hr' : '1 day') : 'units',
       unitPrice: rate,
       total: rate
     };
@@ -176,28 +181,53 @@ export default function QuoteEditorModal({
       if (item.id !== id) return item;
       const days = Math.max(0, daysVal);
       const hours = Math.max(0, hoursVal);
-      const rate = rateVal !== undefined ? rateVal : (item.unitPrice || 0);
+      const defaultHourly = businessDetails.defaultHourlyRate ?? 45;
+      const defaultDay = businessDetails.defaultDayRate ?? 320;
 
-      // Standard trade calculation: 8-hour day
-      const totalDays = Number((days + (hours / 8)).toFixed(3));
-      const total = Number((totalDays * rate).toFixed(2));
+      let effectiveRate = rateVal !== undefined ? rateVal : (item.unitPrice || 0);
 
+      // Auto-switch between default hourly and day rates when toggling between pure hours and days
+      if (rateVal === undefined) {
+        if (days === 0 && hours > 0) {
+          if (item.unitPrice === defaultDay || item.unitPrice === 320 || item.unitPrice === 0 || !item.unitPrice) {
+            effectiveRate = defaultHourly;
+          }
+        } else if (days > 0 && hours === 0) {
+          if (item.unitPrice === defaultHourly || item.unitPrice === 45 || item.unitPrice === 0 || !item.unitPrice) {
+            effectiveRate = defaultDay;
+          }
+        }
+      }
+
+      let totalDays = 0;
+      let total = 0;
       let unitLabel = 'days';
-      if (days > 0 && hours > 0) {
-        unitLabel = `${days}d ${hours}h`;
-      } else if (days > 0) {
-        unitLabel = days === 1 ? '1 day' : `${days} days`;
-      } else if (hours > 0) {
+
+      if (days === 0 && hours > 0) {
+        // Pure hourly labour
         unitLabel = hours === 1 ? '1 hr' : `${hours} hrs`;
+        totalDays = Number((hours / 8).toFixed(3));
+        total = Number((hours * effectiveRate).toFixed(2));
+      } else if (days > 0 && hours === 0) {
+        // Pure daily labour
+        unitLabel = days === 1 ? '1 day' : `${days} days`;
+        totalDays = days;
+        total = Number((days * effectiveRate).toFixed(2));
+      } else if (days > 0 && hours > 0) {
+        // Mixed days + hours
+        unitLabel = `${days}d ${hours}h`;
+        totalDays = Number((days + (hours / 8)).toFixed(3));
+        const dayRate = effectiveRate;
+        total = Number(((days * dayRate) + (hours * defaultHourly)).toFixed(2));
       }
 
       return {
         ...item,
         days,
         hours,
-        quantity: totalDays,
+        quantity: (days === 0 && hours > 0) ? hours : totalDays,
         unit: unitLabel,
-        unitPrice: rate,
+        unitPrice: effectiveRate,
         total
       };
     }));
@@ -469,10 +499,19 @@ export default function QuoteEditorModal({
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => handleAddItem('labour')}
+                  onClick={() => handleAddItem('labour', 'day')}
                   className="px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 rounded-xl text-xs font-bold flex items-center gap-1 border border-emerald-200 dark:border-emerald-800 transition-all"
+                  title="Add day rate labour line item"
                 >
-                  <Clock className="w-3 h-3" /> + Add Labour
+                  <Clock className="w-3 h-3" /> + Day Rate
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleAddItem('labour', 'hour')}
+                  className="px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 rounded-xl text-xs font-bold flex items-center gap-1 border border-emerald-200 dark:border-emerald-800 transition-all"
+                  title="Add hourly labour line item"
+                >
+                  <Clock className="w-3 h-3" /> + Hourly Rate
                 </button>
                 <button
                   type="button"
@@ -498,10 +537,17 @@ export default function QuoteEditorModal({
                 <div className="flex items-center justify-center gap-2 mt-3">
                   <button
                     type="button"
-                    onClick={() => handleAddItem('labour')}
+                    onClick={() => handleAddItem('labour', 'day')}
                     className="px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-bold"
                   >
-                    Add Labour Line
+                    + Add Day Labour
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAddItem('labour', 'hour')}
+                    className="px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-bold"
+                  >
+                    + Add Hourly Labour
                   </button>
                   <button
                     type="button"
@@ -553,9 +599,10 @@ export default function QuoteEditorModal({
                             type="number"
                             min="0"
                             step="1"
-                            value={(item as any).days ?? Math.floor(item.quantity || 0)}
+                            value={(item as any).days ? (item as any).days : ''}
                             onChange={e => {
-                              const d = Math.max(0, parseInt(e.target.value, 10) || 0);
+                              const val = e.target.value;
+                              const d = val === '' ? 0 : Math.max(0, parseInt(val, 10) || 0);
                               const h = (item as any).hours ?? Math.round(((item.quantity || 0) % 1) * 8);
                               handleUpdateLabour(item.id, d, h);
                             }}
@@ -571,9 +618,10 @@ export default function QuoteEditorModal({
                             min="0"
                             max="23"
                             step="0.5"
-                            value={(item as any).hours ?? Math.round(((item.quantity || 0) % 1) * 8)}
+                            value={(item as any).hours ? (item as any).hours : ''}
                             onChange={e => {
-                              const h = Math.max(0, parseFloat(e.target.value) || 0);
+                              const val = e.target.value;
+                              const h = val === '' ? 0 : Math.max(0, parseFloat(val) || 0);
                               const d = (item as any).days ?? Math.floor(item.quantity || 0);
                               handleUpdateLabour(item.id, d, h);
                             }}
@@ -590,10 +638,13 @@ export default function QuoteEditorModal({
                             type="number"
                             min="0"
                             step="any"
-                            value={item.quantity}
-                            onChange={e => handleUpdateItem(item.id, { quantity: parseFloat(e.target.value) || 0 })}
+                            value={item.quantity === 0 ? '' : (item.quantity ?? '')}
+                            onChange={e => {
+                              const val = e.target.value;
+                              handleUpdateItem(item.id, { quantity: val === '' ? ('' as any) : (parseFloat(val) || 0) });
+                            }}
                             className="w-full px-2 py-1.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs font-semibold text-right outline-none text-zinc-900 dark:text-white"
-                            placeholder="Qty"
+                            placeholder="1"
                           />
                         </div>
                         <div className="w-20">
@@ -629,20 +680,25 @@ export default function QuoteEditorModal({
                         type="number"
                         min="0"
                         step="0.50"
-                        value={item.unitPrice}
+                        value={item.unitPrice === 0 ? '' : (item.unitPrice ?? '')}
                         onChange={e => {
-                          const newRate = parseFloat(e.target.value) || 0;
+                          const val = e.target.value;
+                          const newRate = val === '' ? ('' as any) : (parseFloat(val) || 0);
                           if (item.type === 'labour') {
                             const d = (item as any).days ?? Math.floor(item.quantity || 0);
                             const h = (item as any).hours ?? Math.round(((item.quantity || 0) % 1) * 8);
-                            handleUpdateLabour(item.id, d, h, newRate);
+                            handleUpdateLabour(item.id, d, h, typeof newRate === 'number' ? newRate : 0);
                           } else {
                             handleUpdateItem(item.id, { unitPrice: newRate });
                           }
                         }}
                         className="w-full px-2 py-1.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs font-semibold text-right outline-none text-zinc-900 dark:text-white"
-                        placeholder="Rate"
-                        title={item.type === 'labour' ? 'Day Rate (£)' : 'Unit Rate (£)'}
+                        placeholder="0.00"
+                        title={
+                          item.type === 'labour'
+                            ? ((item as any).days === 0 && (item as any).hours > 0 ? 'Hourly Rate (£/hr)' : 'Day Rate (£/day)')
+                            : 'Unit Rate (£)'
+                        }
                       />
                     </div>
 

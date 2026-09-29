@@ -52,7 +52,7 @@ TribeTrade is frequently installed on a dedicated tablet kept in the van or work
 
 **Forgot PIN or Locked Out?**
 1. On the PIN entry screen, tap **Sign Out** / **Forgot PIN?**.
-2. You will be redirected to the secure login screen. Sign in using your registered Google, Microsoft, or Apple account.
+2. You will be redirected to the secure login screen. Sign in using your registered Google, Microsoft, Apple, or Custom Work Email account.
 3. Once authenticated, the old PIN is disabled and you regain full access. You can configure a new PIN in Settings.
 
 ---
@@ -140,7 +140,7 @@ Before sharing your first quote, go to **Settings** > **Business Details & Quota
 2. Use the top toggle to switch between **Quotes** and **Invoices** (just like Tasks & Notes).
 3. Tap **+ New Quote**.
 4. Fill in customer details and multiline job scope (rendered in full on the A4 PDF export without truncation).
-5. Tap **+ Add Labour** to enter precise duration using dedicated **Days** and **Hours** fields (e.g. 1 day and 3 hours @ Day Rate), or **+ Add Material / Consumable** with preset units (`litres`, `tins`, `pack`, `bags`, `metres`, `sq m`, `rolls`, `units`, or custom).
+5. Tap **+ Day Rate** or **+ Hourly Rate** to add labour using your preset standard rates from Settings (or enter custom days/hours with automatic rate switching), or **+ Add Material / Consumable** with preset units (`litres`, `tins`, `pack`, `bags`, `metres`, `sq m`, `rolls`, `units`, or custom).
 6. View live calculations of Labour Subtotal, Materials Subtotal, Net Subtotal, VAT (if registered), and Grand Total in British Pounds (£).
 7. Tap **Save Draft** or **Preview & Share**.
 
@@ -158,8 +158,9 @@ When a customer accepts a quotation (or when you mark it as **Accepted**), Tribe
 
 ### Trade Invoices & Payment Tracking
 - Toggle to the **Invoices** view from the top of the Quotes page.
-- Track **Total Invoiced**, **Paid Invoices**, and **Outstanding Balance** in real-time.
-- Update payment statuses (`Draft`, `Sent`, `Paid`, `Completed`, `Overdue`).
+- Track **Total Invoiced**, **Paid Invoices**, and **Outstanding Balance** in real-time. Invoices marked as **Completed** are finished jobs and are strictly excluded from the Outstanding / Due metrics.
+- Update payment statuses (`Draft`, `Sent`, `Completed`, `Paid`, `Overdue`).
+- **Completed Invoice Lifecycle & Dedicated "Completed" Tab:** Marking an invoice as **Completed** automatically archives it from the active `All` invoices list so your workspace stays uncluttered. To review past completed jobs, simply tap the **Completed** tab in the filter bar (which displays a live count badge of all completed jobs).
 - **Completed & Paid Automatic Turnover Sync:** Marking an invoice as **Completed** or **Paid** automatically logs an income record in your Trade Expenses ledger under HMRC Box 10 (Turnover), including net, VAT, and gross breakdown, keeping your Self-Assessment tax pot up to date.
 - **Effortless Modal Exit:** Invoice and quote modals support instant dismissal via backdrop tap, the Escape key, or dedicated Close buttons.
 - Generate, download, and share professional A4 Invoice PDFs with BACS transfer details, payment terms, and HMRC VAT compliance.
@@ -180,7 +181,7 @@ The floating `+` button in the navigation bar provides rapid entry across the en
 - **Job / Event:** Schedule client appointments and site visits with start and end times, and locations.
 - **Quote (⚡ Quick Quote):** Rapidly create a new quote draft. Tapping **+ Add Quote** flags it as a Quick Quote and immediately takes you to the full quote prompt editor to detail labour, materials, and pricing on the spot.
 - **Expense:** Record merchant purchases with gross amount, date, payment method, and HMRC SA103 tax categories.
-- **Task:** Create pending tasks with due dates, categories, and subtask checklists.
+- **Task:** Create pending tasks with aligned due date and time pickers, optional "No schedule needed" toggle positioned beneath the schedule inputs, categories, and subtask checklists.
 - **Materials:** Add trade consumables, plumbing supplies, paint, or tools directly to the central Pick List.
 - **Note:** Jot down quick reminders or noticeboard messages with colour tags.
 - **Scan:** Instant optical camera intake for till receipts, invoices, or site documents.
@@ -241,10 +242,12 @@ Accessible from **Expenses** (tap **Van Mileage Log**) or from **Settings > Flee
 
 - **Vehicle Dropdown Selection:** Select any vehicle registered in your Fleet & MOT settings directly from a clean dropdown list (e.g. *Ford Transit (VA21 XYZ)*). If driving a temporary replacement or hire van, choose `+ Different / Hire Vehicle` to log custom details.
 - **Base Workshop Address Auto-Fill:** The **From (Start)** field automatically populates with your real registered business address and postcode from **Settings > Business & Rates** (e.g. *Unit 4 Trade Park, Guildford GU1 4RF*). Tap **Use Base** at any time to instantly reset the starting point to your workshop or home depot.
+- **Pull from Invoice:** Tap **Pull from Invoice** next to **To / Client Site** to select any existing invoice. This automatically pulls through the client's site address, journey purpose/reason (e.g. *Bathroom Refurbishment - Sarah Jenkins*), linked job reference, and scope description into the notes.
 - **Automated Road Route Calculation:** Enter your client site address or UK postcode into **To / Client Site** and tap **⚡ Calculate Miles**:
   - The built-in driving engine resolves UK postcodes and road routes to calculate exact road driving distance in miles.
   - **No Google Cloud API Keys Required:** Runs on high-speed UK open data (Postcodes.io and OSRM road network), costing £0 and requiring zero setup.
 - **1-Tap Return Trip (2x):** Tap **🔁 Return Trip (2x)** to automatically double one-way mileage for round-trip callouts.
+- **Clean Consistent Ledger:** Mileage entries are displayed with UK dates (`DD/MM/YYYY`) and refined typography matching the main Expenses & Bookkeeping ledger.
 - **Export Accountant CSV:** Download a detailed travel report including dates, reg, purpose, start/end locations, odometer readings, and claim values formatted for your annual tax return or bookkeeper.
 
 ---

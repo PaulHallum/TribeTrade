@@ -6,6 +6,7 @@ import {
   getDoc,
   addDoc,
   updateDoc,
+  deleteDoc,
   onSnapshot,
   query,
   orderBy,
@@ -19,6 +20,8 @@ export interface ShedStockItem {
   id: string;
   name: string;
   quantity: number;
+  reservedQuantity?: number;
+  isKeyItem?: boolean;
   category?: string;
   unit?: string;
   costPrice?: number;
@@ -157,12 +160,22 @@ export async function assignStockToJob(params: AssignStockParams): Promise<void>
   const stockDocRef = doc(db, 'trade_users', tradeUserId, 'shedInventory', stockItemId);
   const stockSnap = await getDoc(stockDocRef);
   if (stockSnap.exists()) {
-    const currentQty = Number(stockSnap.data()?.quantity || 0);
+    const data = stockSnap.data();
+    const currentQty = Number(data?.quantity || 0);
+    const currentReserved = Number(data?.reservedQuantity || 0);
+    const isKeyItem = Boolean(data?.isKeyItem);
     const newQty = Math.max(0, Number((currentQty - quantityToAssign).toFixed(2)));
-    await updateDoc(stockDocRef, {
-      quantity: newQty,
-      updatedAt: serverTimestamp()
-    });
+    const newReserved = Math.max(0, Number((currentReserved - quantityToAssign).toFixed(2)));
+
+    if (newQty <= 0 && !isKeyItem) {
+      await deleteDoc(stockDocRef);
+    } else {
+      await updateDoc(stockDocRef, {
+        quantity: newQty,
+        reservedQuantity: newReserved,
+        updatedAt: serverTimestamp()
+      });
+    }
   }
 
   // 2. If assigning to an existing Invoice, append material line item and recalculate totals
@@ -276,3 +289,46 @@ export function subscribeShedAllocations(
     }
   );
 }
+
+/**
+ * Reserves a quantity of stock in The Shed for an accepted job / quote.
+ */
+export async function reserveShedStock(
+  tradeUserId: string,
+  stockItemId: string,
+  quantityToReserve: number
+): Promise<void> {
+  if (!tradeUserId || !stockItemId || quantityToReserve <= 0) return;
+  const stockDocRef = doc(db, 'trade_users', tradeUserId, 'shedInventory', stockItemId);
+  const stockSnap = await getDoc(stockDocRef);
+  if (stockSnap.exists()) {
+    const currentReserved = Number(stockSnap.data()?.reservedQuantity || 0);
+    const newReserved = Number((currentReserved + quantityToReserve).toFixed(2));
+    await updateDoc(stockDocRef, {
+      reservedQuantity: newReserved,
+      updatedAt: serverTimestamp()
+    });
+  }
+}
+
+/**
+ * Releases reserved stock back to available pool (e.g. if a quote is cancelled / unbooked).
+ */
+export async function releaseShedStock(
+  tradeUserId: string,
+  stockItemId: string,
+  quantityToRelease: number
+): Promise<void> {
+  if (!tradeUserId || !stockItemId || quantityToRelease <= 0) return;
+  const stockDocRef = doc(db, 'trade_users', tradeUserId, 'shedInventory', stockItemId);
+  const stockSnap = await getDoc(stockDocRef);
+  if (stockSnap.exists()) {
+    const currentReserved = Number(stockSnap.data()?.reservedQuantity || 0);
+    const newReserved = Math.max(0, Number((currentReserved - quantityToRelease).toFixed(2)));
+    await updateDoc(stockDocRef, {
+      reservedQuantity: newReserved,
+      updatedAt: serverTimestamp()
+    });
+  }
+}
+

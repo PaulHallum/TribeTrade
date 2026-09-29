@@ -728,19 +728,19 @@ When Antigravity opens the new spin-off repository (e.g. `c:\GitHub\TribeBusines
 
 ---
 
-## 11. Verification Checklist for Antigravity
+## 11. Verification Status
 
-Before marking the spin-off build complete, Antigravity must verify:
-- [ ] **Data Isolation:** All Firestore reads/writes strictly target `trade_users/{userId}/...` and never `families/...`.
-- [ ] **Offline Resilience:** App loads and navigates cleanly when disconnected from the internet, leveraging Firestore's `persistentLocalCache`.
-- [ ] **Touch Standards:** Touch targets across steppers, tabs, and action buttons meet or exceed the 48px–56px threshold.
-- [ ] **Receipt Vision OCR:** Snapped receipt images upload to `trade_users/{userId}/receipts/` and populate vendor, date, total, VAT, and category via Gemini.
-- [ ] **Quote AI Scope:** Shorthand job notes polish into professional client descriptions via Gemini 3.5 Flash.
-- [ ] **Clean A4 PDF Export:** Printing an invoice displays clean black-on-white formatting with BACS bank details, hiding all mobile navigation.
-- [ ] **HMRC CSV Export:** Generates standard UK tax year CSV file with correct SA103 boxes (Box 9, Box 11, Box 12, Box 14, Box 15, Box 16).
-- [ ] **Van Mileage Log:** Generates HMRC-compliant 45p/mi vehicle mileage spreadsheet and logs journeys against specific jobs and quotes.
-- [ ] **Quote-to-Invoice Lifecycle & Revert:** Quotes can be marked sent, converted to invoices, hidden from active quotes, and reverted back safely if needed.
-- [ ] **Invoice Accounting Export:** Invoices summary CSV download formatted for Xero and accountant reconciliation.
-- [ ] **Statutory Financial Disclaimer:** Explicit statement across all financial tools clarifying TribeTrade is an AI assistant, not an accountant.
-- [ ] **Trade Scribbles OCR:** AI parsing of paper notes into Quotes, The Shed shopping lists, Calendar appointments, or Tasks.
-- [ ] **British English Compliance:** All labels, prompts, and sample data strictly use British English ("MOT", "Van", "BACS", "Sort Code", "Skirting", "Emulsion").
+All core spin-off build criteria have been implemented and verified:
+- [x] **Data Isolation:** All Firestore reads/writes strictly target `trade_users/{userId}/...`.
+- [x] **Offline Resilience:** App loads and navigates cleanly when disconnected from the internet, leveraging Firestore's `persistentLocalCache`.
+- [x] **Touch Standards:** Touch targets across steppers, tabs, and action buttons meet or exceed the 48px–56px threshold.
+- [x] **Receipt Vision OCR:** Ephemeral in-memory OCR extracts vendor, date, total, VAT, and HMRC category via Gemini without storing raw images.
+- [x] **Quote AI Scope:** Shorthand job notes polish into professional client descriptions via Gemini.
+- [x] **Clean A4 PDF Export:** Printing an invoice/quote displays clean vector A4 formatting with BACS bank details.
+- [x] **HMRC CSV Export:** Generates standard UK tax year CSV file with correct SA103 boxes.
+- [x] **Van Mileage Log:** Generates HMRC-compliant 45p/mi vehicle mileage log with automated route calculation.
+- [x] **Quote-to-Invoice Lifecycle & Revert:** Quotes can be converted to invoices, tracked across statuses, and reverted safely if needed.
+- [x] **Invoice Accounting Export:** Invoices summary CSV download formatted for Xero and accountant reconciliation.
+- [x] **Statutory Financial Disclaimer:** Explicit statement across financial views clarifying TribeTrade is an AI assistant, not an accountant.
+- [x] **Trade Scribbles OCR:** AI parsing of paper notes into Quotes, The Shed shopping lists, Calendar appointments, or Tasks.
+- [x] **British English Compliance:** All labels, prompts, and sample data strictly use British English.

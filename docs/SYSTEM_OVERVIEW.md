@@ -37,8 +37,7 @@ The main landing screen after login. It displays:
 ### 1.3 Quotes & Invoices — Trade Quotations, Invoicing & Job Acceptance
 
 Situated directly next to Calendar in the main navigation, **Quotes & Invoices** provides a tactile, dual-view management tool for UK tradespeople:
-- **Quotes & Invoices Toggle** — Segmented control in the header (mirroring the Tasks & Notes toggle) allowing tradespeople to switch between client quotations and processed invoices.
-- **Status Workflow** — Tracks quotes across `draft`, `pending` (sent to client), `accepted`, and `declined` states, and invoices across `draft`, `sent`, `paid`, `completed`, and `overdue` with real-time financial metrics (Total Quoted / Invoiced, Won / Paid Value, Pending / Outstanding Value).
+- **Status Workflow & Automatic Retention** — Tracks quotes across `draft`, `sent`, `pending` (with client), `accepted`, and `declined` states, and invoices across `draft`, `sent`, `completed`, `paid`, and `overdue`. Top financial metrics dynamically reflect active pipeline health: **Total Quoted** strictly tallies active outstanding quotes (`draft`, `sent`, `pending`, excluding won/accepted and declined/lost quotes), paired with **Won / Accepted Value** and **Awaiting Decision** (`pending` and `sent`). Declined quotes are stamped (`declinedAt`) and automatically purged after 30 days to keep the pipeline uncluttered while retaining recent records for reference. Invoices marked `completed` represent fulfilled jobs and are strictly excluded from the Outstanding / Due balance. They are hidden by default from the main `All` invoice ledger to keep the active workspace clean, and can be viewed at any time via the dedicated **Completed** filter tab (with live item count badge).
 - **Completed & Paid Automatic Turnover Sync** — Marking an invoice as `completed` or `paid` automatically creates/updates an income transaction in `trade_users/{tradeUserId}/transactions` under HMRC Box 10 (Turnover) with full net, VAT, and gross breakdown, instantly updating the Self Assessment helper and tax pot.
 - **Quick Quote Prompt Workflow (`isQuickQuote`)** — Quick quotes created from the Quick Add (`+`) bar are flagged with `isQuickQuote: true` and immediately open the full quote prompt editor with a dedicated header badge for rapid on-site pricing.
 - **Enhanced Modal Navigation & Dismissal** — Invoices and quotes editors and preview modals feature backdrop click-to-dismiss, Escape key listener dismissal, and dedicated footer Close actions for seamless navigation.
@@ -61,7 +60,7 @@ Positioned immediately next to **Quotes** in the navigation bar, **Expenses** ma
 - **HMRC SA103 Category Mapping** — Extracted purchases are automatically classified into UK Self Assessment tax expense boxes (Box 11: Cost of goods/materials, Box 12: Van & motor expenses, Box 14: Tools & equipment, Box 16: Office & phone, etc.).
 - **Manual Entry & Verification** — Complete review editor with live Net and VAT calculations, category selectors, and payment methods (Card, Cash, Bank Transfer, Trade Account) styled with British English currency iconography (`ReceiptPoundSterling` and £).
 - **Making Tax Digital (MTD) CSV Export (`mtdExportService`)** — Generates standard HMRC-compliant CSV ledgers with financial executive summaries (Total Net Turnover, Allowable Expenses, Taxable Profit, and Input/Output VAT position) filtered by UK Tax Year (6 April - 5 April), quarterly periods, or custom date ranges.
-- **Sole Trader Self Assessment Preparation Assistant (`selfAssessmentService`, `SelfAssessmentModal`)** — Provides an interactive annual tax preparation tool:
+- **Sole Trader Self Assessment Preparation Assistant (`selfAssessmentService`, `SelfAssessmentModal`)** — Located alongside MTD CSV export at the bottom of the ledger (leaving the top action bar focused on core input workflows: Scan Receipt, Manual Entry, and Van Mileage), provides an interactive annual tax preparation tool:
   - **HMRC SA103 Box Breakdown:** Automatically maps recorded transactions to official HMRC Self Assessment boxes (Box 10 Turnover, Box 11 Materials/Subcontractors, Box 12 Motor, Box 14 Tools/Plant, Box 16 Office, Box 19 Fees/Insurance, Box 28 Total Expenses, Box 31 Net Profit).
   - **Estimated Tax & NI Calculations:** Indicative calculations based on UK Personal Allowance (£12,570), 20%/40% Income Tax, and 6%/2% Class 4 National Insurance.
   - **CIS Deductions Suffered Tracker:** Enables trade subcontractors to input 20% CIS tax withheld at source to estimate their remaining payable balance or HMRC refund position.
@@ -94,12 +93,12 @@ Positioned immediately next to **Quotes** in the navigation bar, **Expenses** ma
 ### 1.8 Email Hub
 
 - **Multi-provider unified inbox & sign-in engine** supporting:
-  - **Google Mail / Gmail** (via secure IMAP over SSL `imap.gmail.com:993` with Google App Passwords, eliminating restricted OAuth scopes and costly CASA fees)
-  - **Microsoft Outlook / Hotmail** (via 1-click Modern Authentication OAuth 2.0 & Microsoft Graph API; Basic Authentication and IMAP App Passwords were permanently retired by Microsoft on 16 September 2024)
+  - **Google Mail / Google Workspace** (via 1-click Google OAuth / Sensitive Calendar synchronisation scope, and secure IMAP over SSL `imap.gmail.com:993` with Google App Passwords)
+  - **Microsoft Outlook / Microsoft 365 / Hotmail** (via 1-click Modern Authentication OAuth 2.0 & Microsoft Graph API supporting personal Microsoft accounts, Office 365, and custom business domains; Basic Authentication and IMAP App Passwords retired by Microsoft on 16 September 2024)
   - **Yahoo / Sky Mail** (via Yahoo OAuth & secure IMAP over SSL `imap.mail.yahoo.com:993` with Yahoo App Passwords generated from Account Security)
   - **Apple Mail / iCloud** (via secure IMAP over SSL `imap.mail.me.com:993` with verified Apple App-Specific Passwords and `@icloud.com` / `@me.com` / `@mac.com` addresses)
-  - **Google Account** (authentication and Google Calendar synchronisation via Sensitive OAuth scope)
-- Users can select their preferred email login account directly on the sign-up / authentication screen (`AuthScreen.tsx` / `/?action=signup`).
+  - **Custom Work Email & Any Domain** (via standard Firebase Email & Password authentication and password reset flows for tradespeople operating custom company domains, e.g. `bob@tradesperson.co.uk`)
+- Users can select their preferred email login account directly on the sign-up / authentication screen (`AuthScreen.tsx` / `EmailAuthModal.tsx` / `/?action=signup`).
 - OAuth authorization code exchange decodes signed JWT `id_token` claims (`preferred_username`, `email`, `name`) to automatically resolve primary email addresses and user display names for Microsoft and Yahoo users.
 - Server-side account deletion endpoint (`/api/user/delete`) allows users to permanently delete their Firestore profile and Firebase Auth account via Admin SDK without client-side re-authentication errors (`auth/requires-recent-login`).
 - Connected accounts are stored in `families/{familyId}/connectedAccounts/{accountId}` with **encrypted OAuth & IMAP tokens** (AES-256-GCM).
@@ -457,14 +456,16 @@ support_tickets/{ticketId}        — User-submitted support tickets
 
 ### 4.8 Van Mileage Log & HMRC Simplified Expenses
 
-- **Collection:** `trade_users/{tradeUserId}/mileageEntries`
+- **Collection:** `trade_users/{tradeUserId}/mileageEntries` (secured in `firestore.rules` under `match /mileageEntries/{entryId}`).
 - **HMRC Rate:** £0.45 per business mile for the first 10,000 miles (HMRC simplified vehicle expenses).
 - **Service:** `mileageService.ts` (`saveMileageEntry`, `deleteMileageEntry`, `subscribeMileageEntries`, `generateMileageCsv`) and `routeService.ts` (`calculateDrivingDistance`, `extractUkPostcode`).
 - **UI:** `MileageLogModal.tsx` accessible from Expenses & Bookkeeping and Vehicle & Fleet Compliance.
   - **Dynamic Fleet Dropdown:** Directly synchronises with registered vehicles in `trade_users/{tradeUserId}/vehicles`, rendering an immediate dropdown list with registration plates, plus a fallback for custom/hire vans.
   - **Base Workshop Address Auto-Fill:** Automatically resolves the user's trading workshop address and postcode from `Settings > Business & Rates` and populates the starting point, complete with a 1-tap "Use Base" reset button.
+  - **Pull from Invoice:** 1-tap "Pull from Invoice" selector allows instant pre-filling of client site address, purpose/reason, and job reference from any existing invoice.
   - **Automated Road Route Calculation:** Leverages UK open postcode geocoding (Postcodes.io) and OSRM road routing engine to calculate driving distance in miles with zero API fees or Google Cloud configuration required.
   - **1-Tap Return Trip (2x):** Instantly doubles calculated one-way mileage for round-trip call-outs.
+  - **Clean Typography & UK Dates:** Consistent with `ExpensesView`, entries display formatted UK dates (`DD/MM/YYYY`) with clean font weights.
 - **Job Quotes & Invoices Integration:** Direct "+ Add Mileage" button in `QuoteEditorModal` and `InvoiceEditorModal` to append standard mileage charges (e.g. 30 miles @ £0.45/mi) as an itemised line item.
 - **Export:** Instant HMRC-compliant CSV download containing date, vehicle, reg, purpose, start/end locations, odometer readings, miles, rate, and claim value.
 
@@ -482,7 +483,7 @@ support_tickets/{ticketId}        — User-submitted support tickets
 - **Service:** `shedService.ts` (`addOrUpdateShedStock`, `assignStockToJob`, `getRecentShedAllocations`).
 - **Smart Receipt & Notes Auto-Assignment (`ADD_TO_SHED_STOCK`):** When Smart Convert or Smart Capture processes an email, PDF invoice, till receipt, delivery note, or list of parts (e.g. from Screwfix, Travis Perkins, Toolstation), it itemises every part with quantity, category, and price into an `ADD_TO_SHED_STOCK` action.
   - **Personal Use Stock Exclusion:** All parts are assumed to be business stock to update The Shed by default. Users are provided with interactive exclusion checkboxes to untick any item purchased for personal use rather than for business/job stock. Only included items update holding quantities in The Shed; excluded personal items are omitted with an explicit confirmation toast.
-- **Stock-to-Job Assignment (`AssignStockModal.tsx`):** Tradespeople can assign holding stock from The Shed directly to an active Quote, Invoice, or custom job. Confirming the assignment decrements holding stock in The Shed, automatically appends an itemised material line item to the target Quote/Invoice with recalculated net and gross totals, and records the allocation in `shedAllocations`.
+- **Stock-to-Job Assignment (`AssignStockModal.tsx`):** Tradespeople can assign holding stock from The Shed directly to an active Trade Invoice or custom direct job (quotes are excluded to prevent premature inventory decrement). Confirming the assignment decrements holding stock in The Shed, automatically appends an itemised material line item to the target Invoice with recalculated net and gross totals, flags the stock with a dedicated `[x] reserved` badge, and groups reserved materials under "Reserved & Allocated Stock by Job" at the base of The Shed.
 - **Usage Service Non-Transactional Locking:** Daily usage counters in `usageService.ts` read parent profile and settings documents non-transactionally with `getDoc` before executing a targeted transaction strictly on the daily `usage/{date}` document, completely eliminating Firestore `failed-precondition` commit errors.
 
 ### 4.11 Unified Navigation & Slide-Out Drawer

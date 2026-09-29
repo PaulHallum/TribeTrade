@@ -47,9 +47,11 @@ export default function PinGate({ children }: PinGateProps) {
       params.has('fromStripe') || 
       sessionStorage.getItem('stripe_redirect') === 'true';
 
+    const isSessionUnlocked = sessionStorage.getItem('tribe_pin_unlocked') === 'true';
+
     if (!hasChecked) {
-      if (isStripeReturn) {
-        sessionStorage.removeItem('stripe_redirect');
+      if (isStripeReturn || isSessionUnlocked) {
+        if (isStripeReturn) sessionStorage.removeItem('stripe_redirect');
         setIsLocked(false);
         setHasChecked(true);
       } else if (settings.pinLock && settings.pinHash) {
@@ -59,6 +61,13 @@ export default function PinGate({ children }: PinGateProps) {
       }
     }
   }, [loading, user, hasChecked, settings.pinLock, settings.pinHash]);
+
+  // Clear session unlock if user logs out
+  useEffect(() => {
+    if (!user) {
+      sessionStorage.removeItem('tribe_pin_unlocked');
+    }
+  }, [user]);
 
   const handlePinKeyPress = async (num: number) => {
     if (enteredPin.length >= 4) return;
@@ -70,6 +79,7 @@ export default function PinGate({ children }: PinGateProps) {
     if (newPin.length === 4) {
       const hashed = await hashPin(newPin);
       if (hashed === settings.pinHash) {
+        sessionStorage.setItem('tribe_pin_unlocked', 'true');
         setIsLocked(false);
         setHasChecked(true);
       } else {
@@ -87,6 +97,7 @@ export default function PinGate({ children }: PinGateProps) {
   };
 
   const handleSuccessfulAccountVerification = async () => {
+    sessionStorage.setItem('tribe_pin_unlocked', 'true');
     setIsLocked(false);
     setHasChecked(true);
     setShowFallback(false);
@@ -163,10 +174,10 @@ export default function PinGate({ children }: PinGateProps) {
           </div>
 
           <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">
-            Tribe Lock Screen
+            Tribe Trade Lock Screen
           </h2>
           <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-8">
-            Enter your 4-digit PIN to access your family hub
+            Enter your 4-digit PIN to access your trade hub
           </p>
 
           {!showFallback ? (

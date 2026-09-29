@@ -575,27 +575,17 @@ export default function QuickAddModal({ onClose, initialDate, restrictToType, in
 
             {(type === 'event' || type === 'task') && (
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2 col-span-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">Date & Time</label>
-                    {type === 'task' && (
-                      <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                        <input 
-                          type="checkbox"
-                          checked={noSchedule}
-                          onChange={(e) => {
-                            setNoSchedule(e.target.checked);
-                          }}
-                          className="w-3.5 h-3.5 text-emerald-600 border-zinc-300 rounded focus:ring-emerald-500"
-                        />
-                        <span className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">No schedule needed</span>
-                      </label>
-                    )}
-                  </div>
+                <div className="col-span-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">
+                    {type === 'event' ? 'Date & Time' : 'Schedule'}
+                  </label>
                 </div>
                 {!noSchedule && (
                   <>
                     <div className={`space-y-2 ${type === 'event' ? 'col-span-2' : ''}`}>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                        {type === 'event' ? 'Date' : 'Due Date'}
+                      </label>
                       <div className="relative">
                         <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
                         <input 
@@ -608,7 +598,9 @@ export default function QuickAddModal({ onClose, initialDate, restrictToType, in
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Start Time</label>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                        {type === 'event' ? 'Start Time' : 'Due Time'}
+                      </label>
                       <div className="relative">
                         <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
                         <input 
@@ -639,6 +631,21 @@ export default function QuickAddModal({ onClose, initialDate, restrictToType, in
                       </div>
                     )}
                   </>
+                )}
+                {type === 'task' && (
+                  <div className="col-span-2">
+                    <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                      <input 
+                        type="checkbox"
+                        checked={noSchedule}
+                        onChange={(e) => {
+                          setNoSchedule(e.target.checked);
+                        }}
+                        className="w-3.5 h-3.5 text-emerald-600 border-zinc-300 rounded focus:ring-emerald-500"
+                      />
+                      <span className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">No schedule needed</span>
+                    </label>
+                  </div>
                 )}
               </div>
             )}

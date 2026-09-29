@@ -30,6 +30,7 @@ export function subscribeQuotes(
       ...docSnap.data()
     } as Quote));
     callback(list);
+    cleanupExpiredDeclinedQuotes(tradeUserId, list).catch(() => {});
   }, (err) => {
     logger.warn('Failed to subscribe to quotes', err);
     callback([]);
@@ -44,7 +45,7 @@ export function subscribeBusinessDetails(
   callback: (details: BusinessDetails) => void
 ): () => void {
   const docRef = doc(db, 'trade_users', tradeUserId);
-  return onSnapshot(docRef, (snap) => {
+  return onSnapshot(docRef, async (snap) => {
     if (snap.exists()) {
       const data = snap.data();
       callback({
@@ -73,6 +74,43 @@ export function subscribeBusinessDetails(
         vehicles: data.vehicles || []
       });
     } else {
+      if (tradeUserId.startsWith('trade_')) {
+        const legacyId = tradeUserId.replace('trade_', 'family_');
+        try {
+          const legacySnap = await getDoc(doc(db, 'trade_users', legacyId));
+          if (legacySnap.exists()) {
+            const data = legacySnap.data();
+            callback({
+              ...DEFAULT_BUSINESS_DETAILS,
+              businessName: data.businessName || data.familyName || '',
+              tradingName: data.tradingName || '',
+              addressLine1: data.addressLine1 || '',
+              addressLine2: data.addressLine2 || '',
+              townCity: data.townCity || '',
+              postcode: data.postcode || '',
+              phone: data.phone || '',
+              email: data.email || '',
+              website: data.website || '',
+              companyNumber: data.companyNumber || '',
+              isVatRegistered: data.isVatRegistered || false,
+              vatNumber: data.vatNumber || '',
+              defaultVatRate: data.defaultVatRate ?? 20,
+              defaultHourlyRate: data.defaultHourlyRate ?? 45,
+              defaultDayRate: data.defaultDayRate ?? 320,
+              bankName: data.bankName || '',
+              accountName: data.accountName || '',
+              sortCode: data.sortCode || '',
+              accountNumber: data.accountNumber || '',
+              defaultPaymentTerms: data.defaultPaymentTerms || DEFAULT_BUSINESS_DETAILS.defaultPaymentTerms,
+              defaultQuoteTerms: data.defaultQuoteTerms || DEFAULT_BUSINESS_DETAILS.defaultQuoteTerms,
+              vehicles: data.vehicles || []
+            });
+            return;
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
       callback(DEFAULT_BUSINESS_DETAILS);
     }
   }, (err) => {
@@ -134,6 +172,10 @@ export async function saveQuote(
     rawData.createdAt = new Date().toISOString();
   }
 
+  if (quote.status === 'declined' && !quote.declinedAt) {
+    rawData.declinedAt = new Date().toISOString();
+  }
+
   // Remove undefined fields and nested undefined keys from items
   const cleanData: any = JSON.parse(JSON.stringify(rawData, (key, value) => value === undefined ? null : value));
 
@@ -180,8 +222,46 @@ export async function updateQuoteStatus(
   status: Quote['status']
 ): Promise<void> {
   const quoteDoc = doc(db, 'trade_users', tradeUserId, 'quotes', quoteId);
-  await updateDoc(quoteDoc, {
+  const now = new Date().toISOString();
+  const updateData: Record<string, any> = {
     status,
-    updatedAt: new Date().toISOString()
+    updatedAt: now
+  };
+  if (status === 'declined') {
+    updateData.declinedAt = now;
+  }
+  await updateDoc(quoteDoc, updateData);
+}
+
+/**
+ * Automatically purges quotes that have been declined for 30 or more days.
+ */
+export async function cleanupExpiredDeclinedQuotes(
+  tradeUserId: string,
+  quotes: Quote[]
+): Promise<void> {
+  if (!tradeUserId || !quotes || quotes.length === 0) return;
+
+  const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+  const now = Date.now();
+
+  const expiredQuotes = quotes.filter(q => {
+    if (q.status !== 'declined') return false;
+    const timestampStr = q.declinedAt || q.updatedAt || q.createdAt;
+    if (!timestampStr) return false;
+    const time = new Date(timestampStr).getTime();
+    if (isNaN(time)) return false;
+    return (now - time) >= THIRTY_DAYS_MS;
   });
+
+  if (expiredQuotes.length === 0) return;
+
+  for (const q of expiredQuotes) {
+    try {
+      await deleteQuote(tradeUserId, q.id);
+      logger.info(`[quoteService] Automatically deleted declined quote ${q.quoteNumber} (${q.id}) after 30 days.`);
+    } catch (err) {
+      logger.warn(`[quoteService] Failed to auto-delete expired quote ${q.id}:`, err);
+    }
+  }
 }

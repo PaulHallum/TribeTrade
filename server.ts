@@ -258,6 +258,7 @@ const oauth2Client = new OAuth2Client(
   `${APP_URL}/auth/callback`
 );
 
+
 const checkInternalAuth = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -1333,7 +1334,8 @@ app.get("/auth/callback", async (req, res) => {
       }
       window.close();
     </script></body></html>`);
-  } catch (error) {
+  } catch (error: any) {
+    console.error("[Google Auth] Token exchange failed:", error?.response?.data || error?.message || error);
     res.status(500).send("Auth Failed");
   }
 });
@@ -1350,7 +1352,8 @@ app.get("/api/calendar/events", async (req, res) => {
     const cal = googleCalendar({ version: "v3", auth: oauth2Client as any });
     const response = await cal.events.list({ calendarId: "primary", maxResults: 10 });
     res.json(response.data.items);
-  } catch (error) {
+  } catch (error: any) {
+    console.error("[Calendar] Sync failed:", error?.response?.data || error?.message || error);
     res.status(500).json({ error: "Calendar Sync Failed" });
   }
 });
@@ -2190,8 +2193,8 @@ app.post("/api/billing/checkout", async (req, res) => {
       : (process.env.STRIPE_PRICE_ID_MONTHLY || process.env.STRIPE_PRICE_ID || "");
 
     const paymentLink = plan === 'yearly'
-      ? (process.env.STRIPE_PAYMENT_LINK_YEARLY || "https://buy.stripe.com/cNibJ1ftJaCG1KR9n500000")
-      : (process.env.STRIPE_PAYMENT_LINK_MONTHLY || "https://buy.stripe.com/28E14n5T926afBH0Qz00001");
+      ? (process.env.STRIPE_PAYMENT_LINK_YEARLY || "https://buy.stripe.com/00wcN5epF8uy89f9n500002")
+      : (process.env.STRIPE_PAYMENT_LINK_MONTHLY || "https://buy.stripe.com/9B614n0yPbGK9djar900003");
 
     // If Price ID is configured, create a native Stripe Checkout Session
     if (priceId) {

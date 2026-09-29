@@ -59,8 +59,55 @@ function calculateHaversineRoadMiles(lat1: number, lon1: number, lat2: number, l
 }
 
 /**
+ * Resolves coordinates and postcode for any UK address or street, checking postcode first then Nominatim.
+ */
+export async function geocodeUkAddress(
+  addressOrPostcode: string
+): Promise<{ lat: number; lng: number; postcode?: string; formatted?: string } | null> {
+  const clean = addressOrPostcode.trim();
+  if (!clean) return null;
+
+  // 1. Try extracting a UK postcode directly
+  const pc = extractUkPostcode(clean);
+  if (pc) {
+    const coords = await geocodeUkPostcode(pc);
+    if (coords) {
+      return { ...coords, postcode: pc, formatted: pc };
+    }
+  }
+
+  // 2. Fall back to free UK Nominatim street-level geocoding for full addresses
+  try {
+    const searchTarget = clean.toLowerCase().includes('uk') || clean.toLowerCase().includes('united kingdom')
+      ? clean
+      : `${clean}, UK`;
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchTarget)}&format=json&countrycodes=gb&limit=1`,
+      { headers: { 'Accept': 'application/json' } }
+    );
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        const item = data[0];
+        const extractedPc = extractUkPostcode(item.display_name);
+        return {
+          lat: parseFloat(item.lat),
+          lng: parseFloat(item.lon),
+          postcode: extractedPc || undefined,
+          formatted: item.display_name
+        };
+      }
+    }
+  } catch (err) {
+    logger.warn('Failed to geocode UK street address via Nominatim', err);
+  }
+
+  return null;
+}
+
+/**
  * Calculates road driving distance between two addresses or UK postcodes.
- * Zero-configuration: Works using free UK open data (Postcodes.io + OSRM) with no API keys required!
+ * Zero-configuration: Works using free UK open data (Postcodes.io + Nominatim + OSRM) with no API keys or CORS issues!
  */
 export async function calculateDrivingDistance(
   origin: string,
@@ -71,80 +118,49 @@ export async function calculateDrivingDistance(
 
   if (!originClean || !destClean) return null;
 
-  // 1. Try extracting UK postcodes from origin and destination
-  const originPostcode = extractUkPostcode(originClean);
-  const destPostcode = extractUkPostcode(destClean);
+  // Geocode both points (resolves postcodes or full street addresses cleanly)
+  const [originGeo, destGeo] = await Promise.all([
+    geocodeUkAddress(originClean),
+    geocodeUkAddress(destClean),
+  ]);
 
-  if (originPostcode && destPostcode) {
-    const [originCoords, destCoords] = await Promise.all([
-      geocodeUkPostcode(originPostcode),
-      geocodeUkPostcode(destPostcode),
-    ]);
-
-    if (originCoords && destCoords) {
-      // 2. Query OSRM free driving route service
-      try {
-        const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${originCoords.lng},${originCoords.lat};${destCoords.lng},${destCoords.lat}?overview=false`;
-        const osrmRes = await fetch(osrmUrl);
-        if (osrmRes.ok) {
-          const osrmData = await osrmRes.json();
-          if (osrmData.routes && osrmData.routes.length > 0) {
-            const distanceMetres = osrmData.routes[0].distance;
-            const miles = Math.round((distanceMetres / 1609.344) * 10) / 10;
-            return {
-              miles,
-              formattedDistance: `${miles} miles`,
-              source: 'road-osrm',
-              originFormatted: originPostcode,
-              destinationFormatted: destPostcode,
-            };
-          }
-        }
-      } catch (osrmErr) {
-        logger.warn('OSRM routing request failed, falling back to Haversine road estimate', osrmErr);
-      }
-
-      // Fallback: Haversine distance with road winding factor
-      const fallbackMiles = calculateHaversineRoadMiles(
-        originCoords.lat,
-        originCoords.lng,
-        destCoords.lat,
-        destCoords.lng
-      );
-      return {
-        miles: fallbackMiles,
-        formattedDistance: `~${fallbackMiles} miles (estimate)`,
-        source: 'haversine-estimate',
-        originFormatted: originPostcode,
-        destinationFormatted: destPostcode,
-      };
-    }
-  }
-
-  // 3. If no postcodes, check if Google Distance Matrix is available via backend or client key
-  try {
-    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-    if (apiKey) {
-      const endpoint = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(originClean)}&destinations=${encodeURIComponent(destClean)}&units=imperial&key=${apiKey}`;
-      const res = await fetch(endpoint);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.rows?.[0]?.elements?.[0]?.status === 'OK') {
-          const element = data.rows[0].elements[0];
-          const metres = element.distance.value;
-          const miles = Math.round((metres / 1609.344) * 10) / 10;
+  if (originGeo && destGeo) {
+    // Query OSRM free driving route service
+    try {
+      const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${originGeo.lng},${originGeo.lat};${destGeo.lng},${destGeo.lat}?overview=false`;
+      const osrmRes = await fetch(osrmUrl);
+      if (osrmRes.ok) {
+        const osrmData = await osrmRes.json();
+        if (osrmData.routes && osrmData.routes.length > 0) {
+          const distanceMetres = osrmData.routes[0].distance;
+          const miles = Math.round((distanceMetres / 1609.344) * 10) / 10;
           return {
             miles,
-            formattedDistance: element.distance.text,
-            source: 'google',
-            originFormatted: data.origin_addresses?.[0],
-            destinationFormatted: data.destination_addresses?.[0],
+            formattedDistance: `${miles} miles`,
+            source: 'road-osrm',
+            originFormatted: originGeo.postcode || originGeo.formatted || originClean,
+            destinationFormatted: destGeo.postcode || destGeo.formatted || destClean,
           };
         }
       }
+    } catch (osrmErr) {
+      logger.warn('OSRM routing request failed, falling back to Haversine road estimate', osrmErr);
     }
-  } catch (googleErr) {
-    logger.warn('Google Maps Distance Matrix check skipped', googleErr);
+
+    // Fallback: Haversine distance with road winding factor
+    const fallbackMiles = calculateHaversineRoadMiles(
+      originGeo.lat,
+      originGeo.lng,
+      destGeo.lat,
+      destGeo.lng
+    );
+    return {
+      miles: fallbackMiles,
+      formattedDistance: `~${fallbackMiles} miles (estimate)`,
+      source: 'haversine-estimate',
+      originFormatted: originGeo.postcode || originGeo.formatted || originClean,
+      destinationFormatted: destGeo.postcode || destGeo.formatted || destClean,
+    };
   }
 
   return null;

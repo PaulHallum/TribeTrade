@@ -306,12 +306,12 @@ export default function ExpensesView() {
         </div>
       </div>
 
-      {/* Main Action Bar - 2x2 grid on mobile, 4-across on desktop, equal size */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
+      {/* Main Action Bar - 3 evenly spaced options across the page */}
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
         {/* Scan Receipt Button */}
         <button
           onClick={handleOpenScanner}
-          className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl sm:rounded-2xl text-xs font-bold shadow-sm transition-all active:scale-95"
+          className="flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-bold shadow-sm transition-all active:scale-95"
         >
           <Camera className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
           <span className="truncate">Scan Receipt</span>
@@ -320,7 +320,7 @@ export default function ExpensesView() {
         {/* Manual Entry Button */}
         <button
           onClick={handleOpenManual}
-          className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 py-2.5 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700/80 rounded-xl sm:rounded-2xl text-xs font-bold shadow-sm transition-all active:scale-95"
+          className="flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2.5 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700/80 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-bold shadow-sm transition-all active:scale-95"
         >
           <PenLine className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
           <span className="truncate">Manual Entry</span>
@@ -329,21 +329,11 @@ export default function ExpensesView() {
         {/* Van Mileage Log Button */}
         <button
           onClick={() => setIsMileageLogOpen(true)}
-          className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 py-2.5 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-amber-800 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/60 rounded-xl sm:rounded-2xl text-xs font-bold shadow-sm transition-all active:scale-95"
+          className="flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2.5 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-amber-800 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/60 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-bold shadow-sm transition-all active:scale-95"
           title="Open Van Mileage Log (HMRC Compliant 45p/mile)"
         >
           <Truck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-600 dark:text-amber-400 shrink-0" />
           <span className="truncate">Van Mileage</span>
-        </button>
-
-        {/* Self Assessment Preparation Assistant Button */}
-        <button
-          onClick={() => setIsSelfAssessmentOpen(true)}
-          className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 py-2.5 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 text-indigo-800 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/60 rounded-xl sm:rounded-2xl text-xs font-bold shadow-sm transition-all active:scale-95"
-          title="Open Sole Trader Self Assessment Preparation Assistant"
-        >
-          <Calculator className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
-          <span className="truncate">Self Assessment</span>
         </button>
       </div>
 
@@ -568,7 +558,7 @@ export default function ExpensesView() {
         )}
       </div>
 
-      {/* Export Section - Below Entries Ledger, Above Disclaimers */}
+      {/* Year-End & Tax Tools Section - Below Entries Ledger, Above Disclaimers */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3.5 sm:p-4 bg-white dark:bg-zinc-900 rounded-2xl sm:rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
@@ -576,22 +566,35 @@ export default function ExpensesView() {
           </div>
           <div className="min-w-0">
             <p className="text-xs font-bold text-zinc-900 dark:text-white truncate">
-              Making Tax Digital (MTD) Export
+              Tax Year & Accounting Tools
             </p>
             <p className="text-[11px] text-zinc-500 truncate">
-              Download accountant-ready CSV for {periodFilter === 'all' ? 'all recorded transactions' : periodFilter === 'current_tax_year' ? 'Tax Year 2025/26' : periodFilter === 'previous_tax_year' ? 'Tax Year 2024/25' : 'the selected quarter'}
+              Sole Trader Self Assessment preparation & accountant-ready MTD CSV export
             </p>
           </div>
         </div>
 
-        <button
-          onClick={handleExportMtdCsv}
-          className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95 shrink-0"
-          title="Download HMRC Making Tax Digital compliant CSV for your accountant"
-        >
-          <Download className="w-4 h-4 shrink-0" />
-          <span>Export MTD CSV</span>
-        </button>
+        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 shrink-0">
+          {/* Self Assessment Preparation Assistant Button */}
+          <button
+            onClick={() => setIsSelfAssessmentOpen(true)}
+            className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 py-2.5 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 text-indigo-800 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/60 rounded-xl text-xs font-bold shadow-sm transition-all active:scale-95"
+            title="Open Sole Trader Self Assessment Preparation Assistant"
+          >
+            <Calculator className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+            <span className="truncate">Self Assessment</span>
+          </button>
+
+          {/* Export MTD CSV Button */}
+          <button
+            onClick={handleExportMtdCsv}
+            className="flex items-center justify-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all active:scale-95"
+            title="Download HMRC Making Tax Digital compliant CSV for your accountant"
+          >
+            <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+            <span className="truncate">Export MTD CSV</span>
+          </button>
+        </div>
       </div>
 
       {/* Footer Disclaimers: Financial Notice & HMRC Compliance */}

@@ -122,8 +122,6 @@ export default function InvoiceEditorModal({
     }
   }, [initialInvoice, suggestedInvoiceNumber, businessDetails, isOpen]);
 
-  if (!isOpen) return null;
-
   // Subtotals
   const subtotalLabour = items
     .filter(i => i.type === 'labour')

@@ -9,14 +9,16 @@ import { auth } from '../../lib/firebase';
 import { signInWithCustomToken } from 'firebase/auth';
 import { useToast } from '../../contexts/ToastContext';
 import { logger } from '../../services/logger';
-import { Loader2, ShieldCheck } from 'lucide-react';
+import { Loader2, ShieldCheck, Mail } from 'lucide-react';
 import AppSpecificPasswordModal from '../settings/AppSpecificPasswordModal';
+import EmailAuthModal from './EmailAuthModal';
 
 export default function AuthScreen() {
   const { signIn } = useAuth();
   const { showToast } = useToast();
   const [connectingProvider, setConnectingProvider] = useState<string | null>(null);
   const [isICloudModalOpen, setIsICloudModalOpen] = useState(false);
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
 
   // Check URL parameters for pre-selected provider
   useEffect(() => {
@@ -175,7 +177,7 @@ export default function AuthScreen() {
               </div>
               <span className="text-xs font-black uppercase tracking-wider">Sign In with Google</span>
             </div>
-            <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-bold uppercase">Google</span>
+            <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-bold uppercase">Workspace / Gmail</span>
           </button>
 
           {/* 2. Microsoft / Outlook */}
@@ -194,7 +196,7 @@ export default function AuthScreen() {
               </div>
               <span className="text-xs font-black uppercase tracking-wider">Sign In with Outlook</span>
             </div>
-            <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-bold uppercase">Office 365</span>
+            <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-bold uppercase">M365 / Outlook</span>
           </button>
 
           {/* 3. Sky Mail & Yahoo Mail */}
@@ -229,6 +231,34 @@ export default function AuthScreen() {
               <span className="text-xs font-black uppercase tracking-wider">Sign In with iCloud</span>
             </div>
             <span className="text-[10px] bg-white/20 dark:bg-zinc-900/20 px-2 py-0.5 rounded-full font-bold uppercase">Apple / iCloud</span>
+          </button>
+
+          {/* Divider */}
+          <div className="relative py-1">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-zinc-200 dark:border-zinc-800" />
+            </div>
+            <div className="relative flex justify-center text-[10px] uppercase">
+              <span className="bg-white dark:bg-zinc-950 px-2.5 text-zinc-400 font-bold tracking-wider">or custom email</span>
+            </div>
+          </div>
+
+          {/* 5. Custom Work Email / Any Domain */}
+          <button
+            onClick={() => setIsEmailModalOpen(true)}
+            disabled={connectingProvider !== null}
+            className="w-full bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-900/80 dark:hover:bg-zinc-800 text-zinc-900 dark:text-white font-bold py-3 px-4 rounded-[20px] flex items-center justify-between border border-zinc-200 dark:border-zinc-750 shadow-sm transition-all active:scale-[0.98] group disabled:opacity-50 cursor-pointer"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-7 h-7 bg-white dark:bg-zinc-800 rounded-xl flex items-center justify-center border border-zinc-200 dark:border-zinc-700 transition-colors shadow-xs">
+                <Mail className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <div className="text-left">
+                <span className="text-xs font-black uppercase tracking-wider block">Custom Work Email</span>
+                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-medium block">e.g. bob@tradesperson.co.uk</span>
+              </div>
+            </div>
+            <span className="text-[10px] bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 px-2 py-0.5 rounded-full font-bold uppercase">Any Domain</span>
           </button>
         </div>
 
@@ -277,6 +307,12 @@ export default function AuthScreen() {
           }}
         />
       )}
+
+      {/* Custom Work Email & Password Modal */}
+      <EmailAuthModal
+        isOpen={isEmailModalOpen}
+        onClose={() => setIsEmailModalOpen(false)}
+      />
     </div>
   );
 }

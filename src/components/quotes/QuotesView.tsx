@@ -183,7 +183,15 @@ export default function QuotesView() {
     return matchesSearch;
   });
 
+  const completedInvoicesCount = invoices.filter(i => i.status === 'completed').length;
+
   const filteredInvoices = invoices.filter(inv => {
+    // If viewing 'all', hide completed invoices so they don't clutter the active list.
+    // Completed invoices are viewed by selecting the 'completed' tab.
+    if (filterInvoiceStatus === 'all' && inv.status === 'completed') {
+      return false;
+    }
+
     const matchesStatus = filterInvoiceStatus === 'all' || inv.status === filterInvoiceStatus;
     const matchesSearch = !query || 
       inv.invoiceNumber?.toLowerCase().includes(query) ||
@@ -196,12 +204,17 @@ export default function QuotesView() {
   });
 
   // Financial Metrics: Quotes
-  const totalQuoted = quotes.reduce((acc, q) => acc + (q.grandTotal || 0), 0);
+  const outstandingQuotes = quotes.filter(
+    q => q.status !== 'accepted' && q.status !== 'declined' && !q.invoiceId
+  );
+  const totalQuoted = outstandingQuotes.reduce((acc, q) => acc + (q.grandTotal || 0), 0);
   const acceptedValue = quotes
     .filter(q => q.status === 'accepted')
     .reduce((acc, q) => acc + (q.grandTotal || 0), 0);
-  const pendingValue = quotes
-    .filter(q => q.status === 'pending')
+  const awaitingQuotes = quotes.filter(
+    q => (q.status === 'pending' || q.status === 'sent') && !q.invoiceId
+  );
+  const pendingValue = awaitingQuotes
     .reduce((acc, q) => acc + (q.grandTotal || 0), 0);
 
   // Financial Metrics: Invoices
@@ -210,7 +223,7 @@ export default function QuotesView() {
     .filter(i => i.status === 'paid')
     .reduce((acc, i) => acc + (i.grandTotal || 0), 0);
   const dueValue = invoices
-    .filter(i => i.status !== 'paid')
+    .filter(i => i.status !== 'paid' && i.status !== 'completed')
     .reduce((acc, i) => acc + (i.grandTotal || 0), 0);
 
   // Quote Actions
@@ -433,7 +446,7 @@ export default function QuotesView() {
               {formatCurrency(activeTab === 'quotes' ? totalQuoted : totalInvoiced)}
             </div>
             <p className="text-[10px] sm:text-[11px] text-zinc-500 mt-0.5 truncate">
-              {activeTab === 'quotes' ? `${quotes.length} total quotes` : `${invoices.length} invoices`}
+              {activeTab === 'quotes' ? `${outstandingQuotes.length} outstanding` : `${invoices.length} invoices`}
             </p>
           </div>
           <div className="hidden sm:flex w-10 h-10 rounded-2xl bg-zinc-100 dark:bg-zinc-800 items-center justify-center text-zinc-600 dark:text-zinc-300 shrink-0">
@@ -474,8 +487,8 @@ export default function QuotesView() {
             </div>
             <p className="text-[10px] sm:text-[11px] text-zinc-500 mt-0.5 truncate">
               {activeTab === 'quotes'
-                ? `${quotes.filter(q => q.status === 'pending').length} pending`
-                : `${invoices.filter(i => i.status !== 'paid').length} unpaid`}
+                ? `${awaitingQuotes.length} awaiting`
+                : `${invoices.filter(i => i.status !== 'paid' && i.status !== 'completed').length} unpaid`}
             </p>
           </div>
           <div className="hidden sm:flex w-10 h-10 rounded-2xl bg-amber-50 dark:bg-amber-950/50 items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
@@ -487,7 +500,7 @@ export default function QuotesView() {
       {/* Controls: Search, Status Filter Pills & New Document Action */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-white dark:bg-zinc-900 p-2.5 sm:p-3 rounded-2xl border border-zinc-200 dark:border-zinc-800">
         {/* Search */}
-        <div className="relative flex-1">
+        <div className="relative flex-1 sm:max-w-xs md:max-w-sm">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
           <input
             type="text"
@@ -515,19 +528,30 @@ export default function QuotesView() {
               </button>
             ))
           ) : (
-            (['all', 'draft', 'sent', 'completed', 'paid', 'overdue'] as const).map(tab => (
-              <button
-                key={tab}
-                onClick={() => setFilterInvoiceStatus(tab)}
-                className={`px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-bold whitespace-nowrap transition-all capitalize ${
-                  filterInvoiceStatus === tab
-                    ? 'bg-emerald-500 text-white shadow-sm'
-                    : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-                }`}
-              >
-                {tab}
-              </button>
-            ))
+            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
+              {(['all', 'draft', 'sent', 'paid', 'overdue', 'completed'] as const).map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setFilterInvoiceStatus(tab)}
+                  className={`px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-bold whitespace-nowrap transition-all capitalize flex items-center gap-1.5 ${
+                    filterInvoiceStatus === tab
+                      ? 'bg-emerald-500 text-white shadow-sm'
+                      : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                  }`}
+                >
+                  <span>{tab}</span>
+                  {tab === 'completed' && completedInvoicesCount > 0 && (
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                      filterInvoiceStatus === 'completed'
+                        ? 'bg-emerald-700 text-white'
+                        : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300'
+                    }`}>
+                      {completedInvoicesCount}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
           )}
         </div>
 
@@ -548,7 +572,7 @@ export default function QuotesView() {
           {/* New Item Button */}
           <button
             onClick={activeTab === 'quotes' ? handleCreateNewQuote : handleCreateNewInvoice}
-            className="px-3.5 py-1.5 sm:py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95 shrink-0"
+            className="min-w-[130px] px-3.5 py-1.5 sm:py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95 shrink-0"
           >
             <Plus className="w-4 h-4" />
             <span>{activeTab === 'quotes' ? 'New Quote' : 'New Invoice'}</span>
@@ -662,6 +686,12 @@ export default function QuotesView() {
                       <span>{quote.dateIssued}</span>
                       <span>•</span>
                       <span>{quote.items?.length || 0} item{(quote.items?.length || 0) === 1 ? '' : 's'}</span>
+                      {isDeclined && (
+                        <>
+                          <span>•</span>
+                          <span className="text-red-500/80 font-medium">Auto-deletes in 30d</span>
+                        </>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-1 shrink-0">
@@ -732,7 +762,9 @@ export default function QuotesView() {
             </div>
             <h3 className="text-sm font-bold text-zinc-800 dark:text-zinc-200">No invoices found</h3>
             <p className="text-xs text-zinc-500 max-w-sm mx-auto">
-              {searchQuery || filterInvoiceStatus !== 'all' 
+              {invoices.length > 0 && filterInvoiceStatus === 'all' && invoices.some(i => i.status === 'completed')
+                ? `You have ${completedInvoicesCount} completed invoice(s) archived. Tap the "Completed" tab to view them.`
+                : searchQuery || filterInvoiceStatus !== 'all' 
                 ? 'No invoices match your current search or filter criteria.' 
                 : 'Convert an accepted quote or create your first trade invoice!'}
             </p>

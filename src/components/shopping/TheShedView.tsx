@@ -11,7 +11,8 @@ import {
   Layers,
   ArrowRight,
   Briefcase,
-  Loader2
+  Loader2,
+  Star
 } from 'lucide-react';
 import { db } from '../../lib/firebase';
 import { 
@@ -28,17 +29,7 @@ import { useToast } from '../../contexts/ToastContext';
 import { detectCategory } from '../../lib/shoppingUtils';
 import ConfirmModal from '../common/ConfirmModal';
 import AssignStockModal from './AssignStockModal';
-import { subscribeShedAllocations, ShedAllocationRecord } from '../../services/shedService';
-
-export interface ShedStockItem {
-  id: string;
-  name: string;
-  quantity: number;
-  category?: string;
-  unit?: string;
-  createdAt?: any;
-  updatedAt?: any;
-}
+import { subscribeShedAllocations, ShedAllocationRecord, ShedStockItem } from '../../services/shedService';
 
 interface TheShedViewProps {
   onSwitchToPickList?: () => void;
@@ -54,6 +45,7 @@ export default function TheShedView({ onSwitchToPickList }: TheShedViewProps) {
   const [loadingAllocations, setLoadingAllocations] = useState(false);
   const [name, setName] = useState('');
   const [quantity, setQuantity] = useState<number | string>(1);
+  const [isKeyItem, setIsKeyItem] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [assignModalItem, setAssignModalItem] = useState<ShedStockItem | null>(null);
@@ -109,15 +101,32 @@ export default function TheShedView({ onSwitchToPickList }: TheShedViewProps) {
         name: trimmedName,
         quantity: parsedQty,
         category,
+        isKeyItem,
+        reservedQuantity: 0,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });
 
       setName('');
       setQuantity(1);
+      setIsKeyItem(false);
       showToast(`Added ${parsedQty}x "${trimmedName}" to The Shed`, 'success');
     } catch (err: any) {
       showToast('Failed to add stock item: ' + err.message, 'error');
+    }
+  };
+
+  const handleToggleKeyItem = async (item: ShedStockItem) => {
+    if (!tradeUserId) return;
+    try {
+      const newKeyVal = !item.isKeyItem;
+      await updateDoc(doc(db, 'trade_users', tradeUserId, 'shedInventory', item.id), {
+        isKeyItem: newKeyVal,
+        updatedAt: serverTimestamp()
+      });
+      showToast(newKeyVal ? `Marked "${item.name}" as Key Item` : `Unmarked "${item.name}" as Key Item`, 'info');
+    } catch (err: any) {
+      showToast('Failed to update: ' + err.message, 'error');
     }
   };
 
@@ -125,10 +134,15 @@ export default function TheShedView({ onSwitchToPickList }: TheShedViewProps) {
     if (!tradeUserId) return;
     const finalQty = Math.max(0, newQty);
     try {
-      await updateDoc(doc(db, 'trade_users', tradeUserId, 'shedInventory', item.id), {
-        quantity: finalQty,
-        updatedAt: serverTimestamp()
-      });
+      if (finalQty <= 0 && !item.isKeyItem) {
+        await deleteDoc(doc(db, 'trade_users', tradeUserId, 'shedInventory', item.id));
+        showToast(`Used up "${item.name}" (removed from The Shed)`, 'info');
+      } else {
+        await updateDoc(doc(db, 'trade_users', tradeUserId, 'shedInventory', item.id), {
+          quantity: finalQty,
+          updatedAt: serverTimestamp()
+        });
+      }
     } catch (err: any) {
       showToast('Failed to update quantity: ' + err.message, 'error');
     }
@@ -171,12 +185,22 @@ export default function TheShedView({ onSwitchToPickList }: TheShedViewProps) {
 
   const totalItems = stock.length;
   const totalUnits = stock.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0);
-  const outOfStockCount = stock.filter(i => (Number(i.quantity) || 0) === 0).length;
+  const outOfStockCount = stock.filter(i => {
+    const q = Number(i.quantity) || 0;
+    const reserved = Number(i.reservedQuantity || reservedMap[i.id] || 0);
+    return Math.max(0, q - reserved) <= 0;
+  }).length;
   const lowStockCount = stock.filter(i => {
     const q = Number(i.quantity) || 0;
-    return q > 0 && q <= 2;
+    const reserved = Number(i.reservedQuantity || reservedMap[i.id] || 0);
+    const avail = Math.max(0, q - reserved);
+    return avail > 0 && avail <= 2;
   }).length;
-  const lowOrOutItems = stock.filter(i => (Number(i.quantity) || 0) <= 2);
+  const lowOrOutItems = stock.filter(i => {
+    const q = Number(i.quantity) || 0;
+    const reserved = Number(i.reservedQuantity || reservedMap[i.id] || 0);
+    return Math.max(0, q - reserved) <= 2;
+  });
 
   const handleAddAllLowStockToShoppingList = async () => {
     if (!tradeUserId || lowOrOutItems.length === 0) return;
@@ -411,6 +435,24 @@ export default function TheShedView({ onSwitchToPickList }: TheShedViewProps) {
             </button>
           </div>
         </div>
+
+        <div className="flex items-center justify-between pt-1 border-t border-zinc-100 dark:border-zinc-800/60">
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={isKeyItem}
+              onChange={(e) => setIsKeyItem(e.target.checked)}
+              className="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
+            />
+            <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+              <Star className={`w-3.5 h-3.5 ${isKeyItem ? 'text-amber-500 fill-amber-500' : 'text-zinc-400'}`} />
+              <span>Key Item (Permanent staple — never auto-removed, flags on Hub when out of stock)</span>
+            </span>
+          </label>
+          <span className="text-[10px] text-zinc-400 hidden sm:inline">
+            Non-key items auto-delete when depleted to 0
+          </span>
+        </div>
       </form>
 
       {/* Search & Category Filter */}
@@ -475,8 +517,11 @@ export default function TheShedView({ onSwitchToPickList }: TheShedViewProps) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {filteredStock.map(item => {
               const qty = Number(item.quantity) || 0;
-              const isOut = qty === 0;
-              const isLow = qty > 0 && qty <= 2;
+              const reserved = Number(item.reservedQuantity || reservedMap[item.id] || 0);
+              const available = Math.max(0, Number((qty - reserved).toFixed(2)));
+              const isOut = available <= 0;
+              const isLow = available > 0 && available <= 2;
+              const isKey = Boolean(item.isKeyItem);
 
               return (
                 <div
@@ -491,40 +536,64 @@ export default function TheShedView({ onSwitchToPickList }: TheShedViewProps) {
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
-                      <h4 className="text-sm font-bold text-zinc-900 dark:text-white truncate">
-                        {item.name}
-                      </h4>
-                      <div className="flex items-center gap-2 mt-1">
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-bold text-zinc-900 dark:text-white truncate">
+                          {item.name}
+                        </h4>
+                        {isKey && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/40 shrink-0">
+                            <Star className="w-2.5 h-2.5 fill-amber-500 text-amber-500" />
+                            Key Item
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
                         {item.category && (
                           <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
                             {item.category}
                           </span>
                         )}
-                        {reservedMap[item.id] > 0 && (
+                        <span className="text-[10px] font-bold text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">
+                          Available: {available} {item.unit || ''}
+                        </span>
+                        {reserved > 0 && (
                           <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800/40 px-1.5 py-0.5 rounded">
-                            {reservedMap[item.id]} reserved
+                            {reserved} reserved
                           </span>
                         )}
                         {isOut && (
                           <span className="text-[10px] font-bold text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/40 px-1.5 py-0.5 rounded">
-                            Out of Stock
+                            {qty > 0 ? 'All Reserved' : 'Out of Stock'}
                           </span>
                         )}
                         {isLow && (
                           <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 rounded">
-                            Low ({qty} left)
+                            Low ({available} left)
                           </span>
                         )}
                       </div>
                     </div>
 
-                    <button
-                      onClick={() => handleDeleteItem(item)}
-                      className="text-zinc-400 hover:text-red-500 p-1 transition-colors"
-                      title="Delete from The Shed"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => handleToggleKeyItem(item)}
+                        className={`p-1.5 rounded-lg transition-colors ${
+                          isKey
+                            ? 'text-amber-500 hover:text-amber-600 bg-amber-50 dark:bg-amber-950/40'
+                            : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                        }`}
+                        title={isKey ? 'Key Item (stays in Shed when 0) - click to unmark' : 'Mark as Key Item (stays in Shed when 0)'}
+                      >
+                        <Star className={`w-4 h-4 ${isKey ? 'fill-amber-500' : ''}`} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteItem(item)}
+                        className="text-zinc-400 hover:text-red-500 p-1.5 transition-colors"
+                        title="Delete from The Shed"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Quantity Stepper & Quick Actions */}
@@ -564,7 +633,7 @@ export default function TheShedView({ onSwitchToPickList }: TheShedViewProps) {
                     <div className="flex items-center gap-1.5 flex-wrap justify-end">
                       <button
                         onClick={() => setAssignModalItem(item)}
-                        disabled={qty <= 0}
+                        disabled={available <= 0}
                         className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl transition-all active:scale-95 text-zinc-700 dark:text-zinc-200 hover:text-blue-600 dark:hover:text-blue-400 bg-zinc-100 dark:bg-zinc-800 hover:bg-blue-50 dark:hover:bg-blue-950/30 disabled:opacity-40 disabled:cursor-not-allowed"
                         title="Assign stock to a Quote, Invoice, or Job"
                       >

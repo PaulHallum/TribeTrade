@@ -273,23 +273,8 @@ export default function TaskModal({ task, members, categories, onClose, onSave, 
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div className="space-y-2 col-span-1 sm:col-span-2">
-              <div className="flex items-center justify-between px-1">
+              <div className="px-1">
                 <label className="text-[9px] font-black text-zinc-400 uppercase tracking-[0.2em]">Due Date & Time</label>
-                <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                  <input 
-                    type="checkbox"
-                    checked={noSchedule}
-                    onChange={(e) => {
-                      setNoSchedule(e.target.checked);
-                      if (e.target.checked) {
-                        setDueDate('');
-                        setDueTime('');
-                      }
-                    }}
-                    className="w-3.5 h-3.5 text-violet-600 border-zinc-300 rounded focus:ring-violet-500"
-                  />
-                  <span className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">No schedule needed</span>
-                </label>
               </div>
               {!noSchedule ? (
                 <div className="space-y-3">
@@ -332,6 +317,23 @@ export default function TaskModal({ task, members, categories, onClose, onSave, 
                   This task will not be scheduled on the calendar.
                 </div>
               )}
+              <div className="px-1 pt-1">
+                <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                  <input 
+                    type="checkbox"
+                    checked={noSchedule}
+                    onChange={(e) => {
+                      setNoSchedule(e.target.checked);
+                      if (e.target.checked) {
+                        setDueDate('');
+                        setDueTime('');
+                      }
+                    }}
+                    className="w-3.5 h-3.5 text-violet-600 border-zinc-300 rounded focus:ring-violet-500"
+                  />
+                  <span className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">No schedule needed</span>
+                </label>
+              </div>
             </div>
 
             <div className="space-y-2">

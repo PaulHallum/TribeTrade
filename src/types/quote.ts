@@ -79,6 +79,7 @@ export interface Quote {
   invoiceId?: string;
   calendarEventId?: string;
   authorId?: string;
+  declinedAt?: string;
   createdAt: string;
   updatedAt?: string;
 }

@@ -212,6 +212,10 @@ service cloud.firestore {
         allow read, write: if belongsToTradeUser(tradeUserId) || isGlobalAdmin();
       }
 
+      match /mileageEntries/{entryId} {
+        allow read, write: if belongsToTradeUser(tradeUserId) || isGlobalAdmin();
+      }
+
       match /transactions/{transactionId} {
         allow read, write: if belongsToTradeUser(tradeUserId) || isGlobalAdmin();
       }

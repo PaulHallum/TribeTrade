@@ -32,7 +32,8 @@ import {
   AlertTriangle,
   FileText,
   PoundSterling,
-  Eye
+  Eye,
+  Warehouse
 } from 'lucide-react';
 import { format, isToday, isTomorrow, isWithinInterval, addDays, startOfDay, endOfDay } from 'date-fns';
 import { useDashboardItems, DashboardItem } from '../../hooks/useDashboardItems';
@@ -48,7 +49,7 @@ import QuotePreviewModal from '../quotes/QuotePreviewModal';
 import { Quote, BusinessDetails, DEFAULT_BUSINESS_DETAILS } from '../../types/quote';
 import { subscribeBusinessDetails, updateQuoteStatus } from '../../services/quoteService';
 import { db, auth } from '../../lib/firebase';
-import { collection, onSnapshot, doc, updateDoc, addDoc, deleteDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, addDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import ConfirmModal from '../common/ConfirmModal';
 import PageHeader from '../common/PageHeader';
 import GoogleIcon from '../layout/GoogleIcon';
@@ -88,6 +89,7 @@ export default function Hub({ onNavigate, onGenerateBriefing }: { onNavigate?: (
   const [members, setMembers] = useState<any[]>([]);
   const [businessName, setBusinessName] = useState('');
   const [categories, setCategories] = useState<any[]>([]);
+  const [outOfStockKeyItems, setOutOfStockKeyItems] = useState<any[]>([]);
   const [isTrashing, setIsTrashing] = useState(false);
   const [connectedAccounts, setConnectedAccounts] = useState<any[]>([]);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
@@ -138,12 +140,28 @@ export default function Hub({ onNavigate, onGenerateBriefing }: { onNavigate?: (
       logger.warn('Hub: Failed to fetch connected accounts snapshot', err);
     });
 
+    const shedRef = collection(db, 'trade_users', tradeUserId, 'shedInventory');
+    const unsubShed = onSnapshot(shedRef, (snapshot) => {
+      const oos = snapshot.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter((item: any) => {
+          if (!item.isKeyItem) return false;
+          const qty = Number(item.quantity) || 0;
+          const res = Number(item.reservedQuantity) || 0;
+          return Math.max(0, qty - res) <= 0;
+        });
+      setOutOfStockKeyItems(oos);
+    }, (err) => {
+      logger.warn('Hub: Failed to fetch shed inventory snapshot', err);
+    });
+
     return () => {
       unsubMembers();
       unsubCategories();
       unsubBusiness();
       unsubTradeUser();
       unsubAccounts();
+      unsubShed();
     };
   }, [tradeUserId]);
 
@@ -654,6 +672,36 @@ export default function Hub({ onNavigate, onGenerateBriefing }: { onNavigate?: (
               <ChevronRight className="w-3.5 h-3.5" />
             </div>
           </motion.div>
+
+          {/* Key Items Out of Stock Alert */}
+          {outOfStockKeyItems.length > 0 && (
+            <motion.div
+              layout
+              onClick={() => onNavigate?.('supplies')}
+              className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800/40 rounded-2xl p-4 sm:p-5 flex items-center justify-between cursor-pointer hover:shadow-sm transition-all group"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="p-2.5 bg-red-100 dark:bg-red-900/40 rounded-xl text-red-600 dark:text-red-400 shrink-0">
+                  <Warehouse className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <span className="block text-[10px] font-black uppercase tracking-wider text-red-600 dark:text-red-400">
+                    Van Stock Alert
+                  </span>
+                  <span className="block font-bold text-sm text-zinc-900 dark:text-zinc-100">
+                    {outOfStockKeyItems.length} key item{outOfStockKeyItems.length > 1 ? 's' : ''} out of stock in The Shed
+                  </span>
+                  <span className="block text-xs text-red-500 dark:text-red-400 truncate">
+                    {outOfStockKeyItems.slice(0, 3).map((i: any) => i.name).join(', ')}{outOfStockKeyItems.length > 3 ? ` +${outOfStockKeyItems.length - 3} more` : ''}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-red-600 dark:text-red-400 group-hover:translate-x-0.5 transition-transform shrink-0">
+                <span>Restock</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </div>
+            </motion.div>
+          )}
         </section>
       </div>
 

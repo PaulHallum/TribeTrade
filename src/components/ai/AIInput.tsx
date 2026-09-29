@@ -483,13 +483,18 @@ export default function AIInput() {
           const rawItems = Array.isArray(data.items) ? data.items : [];
           const quoteItems = rawItems.map((it: any, idx: number) => {
             const qty = Number(it.quantity) || 1;
-            const price = Number(it.unitPrice) || (it.type === 'labour' ? (businessData?.defaultDayRate || 320) : 0);
+            const isHourly = it.unit === 'hours' || it.unit === 'hour' || it.unit === 'hr' || it.unit === 'hrs';
+            const price = Number(it.unitPrice) || (
+              it.type === 'labour'
+                ? (isHourly ? (businessData?.defaultHourlyRate ?? 45) : (businessData?.defaultDayRate ?? 320))
+                : 0
+            );
             return {
               id: `${Date.now()}_${idx}`,
               description: it.description || 'Trade Item',
               type: (it.type === 'material' || it.type === 'labour' || it.type === 'hire' || it.type === 'other') ? it.type : 'labour',
               quantity: qty,
-              unit: it.unit || (it.type === 'labour' ? 'days' : 'units'),
+              unit: it.unit || (it.type === 'labour' ? (isHourly ? 'hours' : 'days') : 'units'),
               unitPrice: price,
               total: Number((qty * price).toFixed(2))
             };
