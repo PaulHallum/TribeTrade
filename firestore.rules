@@ -204,6 +204,10 @@ service cloud.firestore {
         allow read, write: if belongsToTradeUser(tradeUserId) || isGlobalAdmin();
       }
 
+      match /shedAllocations/{allocationId} {
+        allow read, write: if belongsToTradeUser(tradeUserId) || isGlobalAdmin();
+      }
+
       match /quotes/{quoteId} {
         allow read, write: if belongsToTradeUser(tradeUserId) || isGlobalAdmin();
       }

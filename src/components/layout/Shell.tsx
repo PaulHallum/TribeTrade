@@ -401,7 +401,7 @@ export default function Shell() {
     await new Promise(resolve => setTimeout(resolve, 1500));
     setLastSynced(new Date());
     setIsSyncing(false);
-    showToast('Dashboard synced with Google', 'success');
+    showToast('Google Calendar refreshed', 'success');
   };
 
   const isAdmin = user?.email === 'paulhallum@gmail.com' || user?.email === 'paulhallum@googlemail.com';

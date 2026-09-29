@@ -84,7 +84,7 @@ export default function NavigationDrawer({
   }
 
   const preferenceItems = [
-    { id: 'settings' as View, label: 'Settings & Sync', icon: Settings },
+    { id: 'settings' as View, label: 'Settings', icon: Settings },
     { id: 'guide' as View, label: 'User Guide', icon: BookOpen },
   ];
 

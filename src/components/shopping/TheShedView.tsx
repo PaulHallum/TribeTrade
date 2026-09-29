@@ -183,6 +183,17 @@ export default function TheShedView({ onSwitchToPickList }: TheShedViewProps) {
     }
   };
 
+  // Map of reserved quantities per stock item from job allocations
+  const reservedMap = useMemo(() => {
+    const map: { [stockItemId: string]: number } = {};
+    for (const a of allocations) {
+      if (a.stockItemId) {
+        map[a.stockItemId] = Number(((map[a.stockItemId] || 0) + (Number(a.quantity) || 0)).toFixed(2));
+      }
+    }
+    return map;
+  }, [allocations]);
+
   const totalItems = stock.length;
   const totalUnits = stock.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0);
   const outOfStockCount = stock.filter(i => {
@@ -221,17 +232,6 @@ export default function TheShedView({ onSwitchToPickList }: TheShedViewProps) {
   };
 
   const categories = Array.from(new Set(stock.map(i => i.category || 'General Materials')));
-
-  // Map of reserved quantities per stock item from job allocations
-  const reservedMap = useMemo(() => {
-    const map: { [stockItemId: string]: number } = {};
-    for (const a of allocations) {
-      if (a.stockItemId) {
-        map[a.stockItemId] = Number(((map[a.stockItemId] || 0) + (Number(a.quantity) || 0)).toFixed(2));
-      }
-    }
-    return map;
-  }, [allocations]);
 
   // Group allocations by target job/invoice
   const allocationsByJob = useMemo(() => {

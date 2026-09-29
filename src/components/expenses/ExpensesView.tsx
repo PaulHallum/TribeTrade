@@ -22,6 +22,7 @@ import {
   Calculator,
   PenLine,
   Truck,
+  Package,
   ShieldAlert
 } from 'lucide-react';
 import SelfAssessmentModal from './SelfAssessmentModal';
@@ -31,6 +32,8 @@ import {
   TRANSACTION_CATEGORIES,
   TransactionCategoryKey
 } from '../../types/transaction';
+import { MileageEntry, HMRC_STANDARD_MILEAGE_RATE } from '../../types/vehicle';
+import { subscribeMileageEntries } from '../../services/mileageService';
 import { BusinessDetails, DEFAULT_BUSINESS_DETAILS } from '../../types/quote';
 import { subscribeBusinessDetails } from '../../services/quoteService';
 import {
@@ -45,6 +48,7 @@ import {
   downloadMtdCsv,
   TaxPeriodFilter
 } from '../../services/mtdExportService';
+import { addOrUpdateShedStock } from '../../services/shedService';
 import PageHeader from '../common/PageHeader';
 import ConfirmModal from '../common/ConfirmModal';
 import ReceiptScannerModal from './ReceiptScannerModal';
@@ -59,6 +63,7 @@ export default function ExpensesView() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [businessDetails, setBusinessDetails] = useState<BusinessDetails>(DEFAULT_BUSINESS_DETAILS);
   const [loading, setLoading] = useState(true);
+  const [mileageEntries, setMileageEntries] = useState<MileageEntry[]>([]);
 
   // Filters
   const [periodFilter, setPeriodFilter] = useState<TaxPeriodFilter>('current_tax_year');
@@ -73,6 +78,10 @@ export default function ExpensesView() {
   const [isMileageLogOpen, setIsMileageLogOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [extractedReceipt, setExtractedReceipt] = useState<ExtractedReceiptData | null>(null);
+  const [shedPrompt, setShedPrompt] = useState<{ isOpen: boolean; data: ExtractedReceiptData | null }>({
+    isOpen: false,
+    data: null
+  });
   const [confirmDelete, setConfirmDelete] = useState<{
     isOpen: boolean;
     id: string;
@@ -85,7 +94,7 @@ export default function ExpensesView() {
 
   const activeTradeUserId = tradeUserId || (user ? `trade_${user.uid}` : '');
 
-  // 1. Subscribe to transactions & business details
+  // 1. Subscribe to transactions, mileage entries & business details
   useEffect(() => {
     if (!activeTradeUserId) {
       setLoading(false);
@@ -101,11 +110,28 @@ export default function ExpensesView() {
       setBusinessDetails(biz);
     });
 
+    const unsubMileage = subscribeMileageEntries(activeTradeUserId, (list) => {
+      setMileageEntries(list);
+    });
+
     return () => {
       unsubTrans();
       unsubBiz();
+      unsubMileage();
     };
   }, [activeTradeUserId]);
+
+  // Mileage summary for current tax year (6 April – 5 April)
+  const currentYear = new Date().getMonth() >= 3 ? new Date().getFullYear() : new Date().getFullYear() - 1;
+  const taxYearStart = new Date(`${currentYear}-04-06`);
+  const taxYearEnd = new Date(`${currentYear + 1}-04-05`);
+  const currentYearMileage = mileageEntries.filter(e => {
+    const d = new Date(e.date);
+    return d >= taxYearStart && d <= taxYearEnd;
+  });
+  const totalMiles = currentYearMileage.reduce((acc, e) => acc + (Number(e.miles) || 0), 0);
+  const totalMileageClaim = currentYearMileage.reduce((acc, e) => acc + (Number(e.totalClaim) || 0), 0);
+  const recentMileageEntries = currentYearMileage.slice(0, 5);
 
   // 2. Listen for custom event triggered from camera icon / Magic Mic
   useEffect(() => {
@@ -170,6 +196,40 @@ export default function ExpensesView() {
   const handleReceiptExtracted = (data: ExtractedReceiptData) => {
     setEditingTransaction(null);
     setExtractedReceipt(data);
+    // Ask whether to add items to The Shed before opening the transaction editor
+    setShedPrompt({ isOpen: true, data });
+  };
+
+  const handleShedPromptConfirm = async (addToShed: boolean) => {
+    const data = shedPrompt.data;
+    setShedPrompt({ isOpen: false, data: null });
+    if (!data) return;
+
+    if (addToShed && activeTradeUserId && data.lineItems && data.lineItems.length > 0) {
+      try {
+        const items = data.lineItems.map(li => ({
+          name: li.description,
+          quantity: li.quantity || 1,
+          supplier: data.vendor
+        }));
+        const { addedCount, updatedCount } = await addOrUpdateShedStock(activeTradeUserId, items);
+        showToast(`Added ${addedCount + updatedCount} item(s) to The Shed from this receipt.`, 'success');
+      } catch (err: any) {
+        showToast('Could not add items to The Shed: ' + err.message, 'error');
+      }
+    } else if (addToShed) {
+      // No line items — add vendor as a generic item
+      if (activeTradeUserId) {
+        try {
+          await addOrUpdateShedStock(activeTradeUserId, [{ name: data.vendor, quantity: 1, supplier: data.vendor }]);
+          showToast(`Added "${data.vendor}" to The Shed.`, 'success');
+        } catch (err: any) {
+          showToast('Could not add to The Shed: ' + err.message, 'error');
+        }
+      }
+    }
+
+    // Open transaction editor
     setIsEditorOpen(true);
     showToast(`Receipt scanned from ${data.vendor}. Please verify figures.`, 'info');
   };
@@ -335,6 +395,82 @@ export default function ExpensesView() {
           <Truck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-600 dark:text-amber-400 shrink-0" />
           <span className="truncate">Van Mileage</span>
         </button>
+      </div>
+
+      {/* Van Mileage Summary Panel */}
+      <div className="bg-white dark:bg-zinc-900 rounded-2xl sm:rounded-3xl border border-amber-200/70 dark:border-amber-800/50 shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-amber-100 dark:border-amber-900/40 bg-amber-50/50 dark:bg-amber-950/20">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center text-amber-600 dark:text-amber-400">
+              <Truck className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="text-xs font-black text-zinc-900 dark:text-white">Van Mileage Log</p>
+              <p className="text-[10px] text-zinc-500">
+                {currentYearMileage.length} trips · Tax Year {currentYear}/{(currentYear + 1).toString().slice(2)}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <p className="text-[10px] text-zinc-400 font-semibold uppercase tracking-wider">HMRC Claim</p>
+              <p className="text-sm font-black text-amber-700 dark:text-amber-300">£{totalMileageClaim.toFixed(2)}</p>
+              <p className="text-[10px] text-zinc-500">{totalMiles.toFixed(1)} miles @ {(HMRC_STANDARD_MILEAGE_RATE * 100).toFixed(0)}p</p>
+            </div>
+            <button
+              onClick={() => setIsMileageLogOpen(true)}
+              className="flex items-center gap-1 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-[11px] font-bold shadow-sm transition-all active:scale-95"
+            >
+              <Info className="w-3 h-3" />
+              <span>Full Log</span>
+            </button>
+          </div>
+        </div>
+
+        {recentMileageEntries.length === 0 ? (
+          <div className="py-5 px-4 text-center">
+            <p className="text-xs text-zinc-500">No mileage logged yet this tax year.</p>
+            <button
+              onClick={() => setIsMileageLogOpen(true)}
+              className="mt-2 text-xs font-bold text-amber-600 hover:text-amber-700 underline"
+            >
+              Log your first trip
+            </button>
+          </div>
+        ) : (
+          <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
+            {recentMileageEntries.map(entry => {
+              const [y, m, d] = (entry.date || '').split('-');
+              const ukDate = y && m && d ? `${d}/${m}/${y}` : entry.date;
+              return (
+                <div key={entry.id} className="flex items-center justify-between px-4 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 truncate">
+                      {entry.destination || entry.purpose || 'Trip'}
+                    </p>
+                    <p className="text-[10px] text-zinc-400 truncate">
+                      {ukDate} · {entry.startLocation ? `${entry.startLocation} → ` : ''}{entry.destination}
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0 pl-3">
+                    <p className="text-xs font-black text-zinc-900 dark:text-white">{Number(entry.miles).toFixed(1)} mi</p>
+                    <p className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">£{Number(entry.totalClaim).toFixed(2)}</p>
+                  </div>
+                </div>
+              );
+            })}
+            {currentYearMileage.length > 5 && (
+              <div className="px-4 py-2 text-center">
+                <button
+                  onClick={() => setIsMileageLogOpen(true)}
+                  className="text-[11px] font-bold text-amber-600 hover:text-amber-700 dark:text-amber-400"
+                >
+                  View all {currentYearMileage.length} trips in full log →
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Search & Filter Toolbar */}
@@ -634,6 +770,57 @@ export default function ExpensesView() {
         onClose={() => setIsScannerOpen(false)}
         onExtracted={handleReceiptExtracted}
       />
+
+      {/* Shed Prompt: Add scanned items to The Shed? */}
+      {shedPrompt.isOpen && shedPrompt.data && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-zinc-950/60 backdrop-blur-sm"
+            onClick={() => handleShedPromptConfirm(false)}
+          />
+          <div className="relative w-full max-w-sm bg-white dark:bg-zinc-900 rounded-[24px] shadow-2xl border border-zinc-200 dark:border-zinc-800 p-5 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+                <Package className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-sm font-black text-zinc-900 dark:text-white">Add to The Shed?</p>
+                <p className="text-xs text-zinc-500 mt-0.5">
+                  Receipt from <strong className="text-zinc-700 dark:text-zinc-300">{shedPrompt.data.vendor}</strong> scanned.
+                  {shedPrompt.data.lineItems && shedPrompt.data.lineItems.length > 0
+                    ? ` Add ${shedPrompt.data.lineItems.length} item(s) to your stock inventory?`
+                    : ' Add this supplier to your stock inventory?'}
+                </p>
+              </div>
+            </div>
+            {shedPrompt.data.lineItems && shedPrompt.data.lineItems.length > 0 && (
+              <div className="rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 divide-y divide-zinc-100 dark:divide-zinc-700 max-h-32 overflow-y-auto">
+                {shedPrompt.data.lineItems.slice(0, 6).map((li, i) => (
+                  <div key={i} className="flex items-center justify-between px-3 py-1.5 text-xs">
+                    <span className="text-zinc-700 dark:text-zinc-300 truncate">{li.description}</span>
+                    <span className="text-zinc-400 shrink-0 ml-2">×{li.quantity || 1}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-2.5 pt-1">
+              <button
+                onClick={() => handleShedPromptConfirm(false)}
+                className="flex-1 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl text-xs font-bold hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all"
+              >
+                No, skip
+              </button>
+              <button
+                onClick={() => handleShedPromptConfirm(true)}
+                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all active:scale-95"
+              >
+                Yes, add to Shed
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       <TransactionEditorModal
         isOpen={isEditorOpen}

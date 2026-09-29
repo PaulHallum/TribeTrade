@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion } from 'motion/react';
-import { X, Trash2, Save, Calendar as CalendarIcon, Clock, MapPin, AlignLeft, Loader2, Navigation, Sparkles, Share2, Bell } from 'lucide-react';
+import { X, Trash2, Save, Calendar as CalendarIcon, Clock, MapPin, AlignLeft, Loader2, Navigation, Sparkles, Share2, Bell, Info } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useSettings } from '../../contexts/SettingsContext';
 import { useToast } from '../../contexts/ToastContext';
@@ -65,6 +65,15 @@ export default function CalendarEventModal({ event, tradeUserId, members, onClos
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showSmartConvert, setShowSmartConvert] = useState(false);
+
+  // Detect full-day jobs (>= 6 hours) to suggest splitting across two half-days
+  const eventDurationHours = useMemo(() => {
+    const start = ensureDate(editingEvent.startTime);
+    const end = editingEvent.endTime ? ensureDate(editingEvent.endTime) : null;
+    if (!end || isNaN(start.getTime()) || isNaN(end.getTime())) return 0;
+    return (end.getTime() - start.getTime()) / 3600000;
+  }, [editingEvent.startTime, editingEvent.endTime]);
+  const isFullDayJob = eventDurationHours >= 6;
 
   const handleUpdateEvent = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -624,9 +633,23 @@ export default function CalendarEventModal({ event, tradeUserId, members, onClos
                 </div>
               </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em] px-1">Location</label>
+              {/* Full-day scheduling tip */}
+              {isFullDayJob && !isBirthday && !isGoogle && (
+                <div className="flex items-start gap-2.5 p-3.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 rounded-2xl text-xs">
+                  <Info className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                  <div className="space-y-0.5">
+                    <p className="font-bold text-amber-800 dark:text-amber-300">Full-Day Job Tip</p>
+                    <p className="text-amber-700 dark:text-amber-400 leading-relaxed">
+                      This job is scheduled for a full day ({Math.round(eventDurationHours)}h). If a full day isn't available in your schedule, consider splitting it across
+                      two half-days — for example, morning (8am–1pm) on one day and afternoon (1pm–6pm) on another.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em] px-1">Location</label>
                     <div className="relative group/loc">
                       <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none" />
                       <input 
