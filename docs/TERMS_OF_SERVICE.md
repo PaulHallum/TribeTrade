@@ -12,11 +12,11 @@ TribeTrade provides a UK-focussed trade operating system and business organisati
 
 To ensure transparency and trust, our billing practices are straightforward and designed to put you in control.
 
-### 2.1 The "Reverse Trial" (14-Day Free Access)
-When you create a new TribeTrade account, you are automatically enrolled in our 14-Day Reverse Trial.
+### 2.1 The "Reverse Trial" (21-Day Free Access)
+When you create a new TribeTrade account, you are automatically enrolled in our 21-Day Reverse Trial.
 - **No Upfront Payment:** You are **not** required to enter a credit card or any payment details to start your trial.
-- **Full Premium Access:** You receive 100% unrestricted access to all Premium features (including AI quote drafting, receipt OCR, and voice briefings) for exactly 14 days.
-- **Trial Expiration:** If you do not actively choose to subscribe and provide payment details before the 14 days end, your account will simply revert to our Free tier (with manual invoicing, standard calendar, and 3 active quotes). You will never be charged automatically at the end of your trial.
+- **Full Premium Access:** You receive 100% unrestricted access to all Premium features (including AI quote drafting, receipt OCR, and voice briefings) for exactly 21 days.
+- **Trial Expiration:** If you do not actively choose to subscribe and provide payment details before the 21 days end, your account will simply revert to our Free tier (with manual invoicing, standard calendar, and 3 active quotes). You will never be charged automatically at the end of your trial.
 
 ### 2.2 Subscription Tiers and Pricing
 If you choose to upgrade to TribeTrade Premium, the subscription covers your entire Trade Hub (all invited crew members and apprentices). We offer two straightforward pricing plans:
@@ -26,7 +26,7 @@ If you choose to upgrade to TribeTrade Premium, the subscription covers your ent
 All payments are processed securely via our payment partner, Stripe. Prices are in British Pounds (£) and inclusive of VAT where applicable. Your subscription will automatically renew at the end of each billing cycle (monthly or yearly) unless cancelled.
 
 ### 2.3 Fair Use Policy (AI Tools)
-To maintain top performance and availability for all UK trades, Premium accounts include a generous Fair Use limit of **50 AI requests per day** across receipt OCR scans, Magic Mic voice dictations, smart quote draftings, and 6 AM morning briefings.
+To maintain top performance and availability for all UK trades, Premium accounts include a generous Fair Use limit of **50 AI requests per day** across receipt OCR scans, Magic Mic voice dictations, smart quote draftings, and on-demand daily briefings.
 
 ### 2.4 Cancellation Policy
 You may cancel your TribeTrade subscription at any time.
@@ -35,7 +35,7 @@ You may cancel your TribeTrade subscription at any time.
 
 ### 2.5 Refund Policy
 We aim to ensure you are fully satisfied with TribeTrade.
-- **Monthly Subscriptions:** Because we offer a 14-day risk-free trial without requiring payment details upfront, monthly subscription payments are generally non-refundable. 
+- **Monthly Subscriptions:** Because we offer a 21-day risk-free trial without requiring payment details upfront, monthly subscription payments are generally non-refundable. 
 - **Yearly Subscriptions:** If you purchase a yearly subscription and are unsatisfied, you may request a pro-rated refund within the first 14 days of the charge.
 - **Exceptional Circumstances:** If you experience technical issues that prevent you from using the Service, or if you believe you have been charged in error, please contact our support team immediately. We review refund requests on a case-by-case basis to ensure fair resolution.
 

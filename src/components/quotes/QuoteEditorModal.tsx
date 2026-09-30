@@ -89,15 +89,16 @@ export default function QuoteEditorModal({
       setCustomerAddress(initialQuote.customerAddress || '');
       setJobTitle(initialQuote.jobTitle || '');
       setJobDescription(initialQuote.jobDescription || '');
-      const mappedItems = (initialQuote.items || []).map(it => {
+      const mappedItems = (initialQuote.items || []).map((it, idx) => {
+        const uniqueId = it.id || `item_${Date.now()}_${idx}_${Math.random().toString(36).substr(2, 7)}`;
         if (it.type === 'labour') {
           const qty = it.quantity || 1;
           const isHourlyUnit = it.unit?.includes('hr') || it.unit?.includes('hour');
           const d = (it as any).days ?? (isHourlyUnit ? 0 : Math.floor(qty));
           const h = (it as any).hours ?? (isHourlyUnit ? qty : Math.round((qty % 1) * 8));
-          return { ...it, days: d, hours: h };
+          return { ...it, id: uniqueId, days: d, hours: h };
         }
-        return it;
+        return { ...it, id: uniqueId };
       });
       setItems(mappedItems);
       setIsVatRegistered(initialQuote.isVatRegistered ?? (businessDetails.isVatRegistered || false));
@@ -147,8 +148,9 @@ export default function QuoteEditorModal({
       ? (businessDetails.defaultHourlyRate ?? 45)
       : (businessDetails.defaultDayRate ?? 320);
     const rate = isLabour ? defaultRate : 0;
+    const uniqueId = `item_${Date.now()}_${Math.random().toString(36).substr(2, 7)}`;
     const newItem: QuoteItem & { days?: number; hours?: number } = {
-      id: Date.now().toString(),
+      id: uniqueId,
       description: isLabour ? (isHourly ? 'Trade Labour (Hourly)' : 'Trade Labour') : '',
       type,
       days: isLabour ? (isHourly ? 0 : 1) : undefined,
@@ -164,8 +166,9 @@ export default function QuoteEditorModal({
   const handleAddMileageItem = () => {
     const defaultMiles = 30;
     const defaultRate = 0.45;
+    const uniqueId = `mileage_${Date.now()}_${Math.random().toString(36).substr(2, 7)}`;
     const newItem: QuoteItem = {
-      id: `mileage_${Date.now()}`,
+      id: uniqueId,
       description: `Van Travel / Mileage (${defaultMiles} miles @ £${defaultRate.toFixed(2)}/mi)`,
       type: 'other',
       quantity: defaultMiles,
@@ -189,11 +192,11 @@ export default function QuoteEditorModal({
       // Auto-switch between default hourly and day rates when toggling between pure hours and days
       if (rateVal === undefined) {
         if (days === 0 && hours > 0) {
-          if (item.unitPrice === defaultDay || item.unitPrice === 320 || item.unitPrice === 0 || !item.unitPrice) {
+          if (item.unitPrice === defaultDay || item.unitPrice === 0 || !item.unitPrice) {
             effectiveRate = defaultHourly;
           }
         } else if (days > 0 && hours === 0) {
-          if (item.unitPrice === defaultHourly || item.unitPrice === 45 || item.unitPrice === 0 || !item.unitPrice) {
+          if (item.unitPrice === defaultHourly || item.unitPrice === 0 || !item.unitPrice) {
             effectiveRate = defaultDay;
           }
         }
@@ -218,7 +221,8 @@ export default function QuoteEditorModal({
         unitLabel = `${days}d ${hours}h`;
         totalDays = Number((days + (hours / 8)).toFixed(3));
         const dayRate = effectiveRate;
-        total = Number(((days * dayRate) + (hours * defaultHourly)).toFixed(2));
+        const hourRate = dayRate > 0 ? (dayRate / 8) : defaultHourly;
+        total = Number(((days * dayRate) + (hours * hourRate)).toFixed(2));
       }
 
       return {

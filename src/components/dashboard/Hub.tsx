@@ -72,7 +72,7 @@ interface EmailMessage {
   body?: string;
 }
 
-export default function Hub({ onNavigate, onGenerateBriefing }: { onNavigate?: (view: string, tab?: string) => void, onGenerateBriefing?: () => void }) {
+export default function Hub({ onNavigate, onGenerateBriefing }: { onNavigate?: (view: string, tab?: string | null, itemId?: string | null) => void, onGenerateBriefing?: () => void }) {
   const { showToast } = useToast();
   const { items, loading } = useDashboardItems();
   const { tradeUserId, user, googleAccessToken, refreshGoogleToken } = useAuth();
@@ -461,7 +461,7 @@ export default function Hub({ onNavigate, onGenerateBriefing }: { onNavigate?: (
             <button
               onClick={onGenerateBriefing}
               className="relative overflow-hidden px-3 sm:px-4 h-12 sm:h-14 bg-emerald-50 dark:bg-emerald-900/30 rounded-2xl flex items-center gap-2 sm:gap-2.5 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-all shadow-sm group border border-emerald-200/50 dark:border-emerald-800/30 shrink-0"
-              title="Morning Briefing"
+              title="Briefing"
             >
               <motion.div 
                 className="absolute top-0 bottom-0 w-[150%] bg-gradient-to-r from-transparent via-emerald-200/80 dark:via-emerald-400/60 to-transparent -skew-x-12 opacity-90"
@@ -471,9 +471,9 @@ export default function Hub({ onNavigate, onGenerateBriefing }: { onNavigate?: (
               <Sparkles size={20} className="sm:w-6 sm:h-6 group-hover:scale-110 transition-transform relative z-10 shrink-0" />
               <div className="flex flex-col items-start relative z-10 text-left">
                 <span className="text-xs font-bold leading-tight">
-                  <span className="hidden sm:inline">Morning </span>Briefing
+                  Briefing
                 </span>
-                <span className="text-[10px] font-medium opacity-80 leading-tight hidden sm:inline">AI Morning Brief</span>
+                <span className="text-[10px] font-medium opacity-80 leading-tight hidden sm:inline">AI Audio Brief</span>
               </div>
             </button>
           )
@@ -966,7 +966,10 @@ export default function Hub({ onNavigate, onGenerateBriefing }: { onNavigate?: (
           businessDetails={businessDetails}
           onEdit={(q) => {
             setSelectedQuoteForPreview(null);
-            onNavigate?.('quotes');
+            onNavigate?.('quotes', null, q.id);
+            setTimeout(() => {
+              window.dispatchEvent(new CustomEvent('tribe_open_quote_draft', { detail: { quote: q } }));
+            }, 50);
           }}
           onStatusChange={async (quoteId, status) => {
             if (!tradeUserId) return;

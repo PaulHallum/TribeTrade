@@ -60,7 +60,12 @@ import PageHeader from '../common/PageHeader';
 import { useAuth } from '../../App';
 import { useToast } from '../../contexts/ToastContext';
 
-export default function QuotesView() {
+interface QuotesViewProps {
+  initialQuoteId?: string | null;
+  onInitialItemHandled?: () => void;
+}
+
+export default function QuotesView({ initialQuoteId, onInitialItemHandled }: QuotesViewProps = {}) {
   const { user, tradeUserId } = useAuth();
   const { showToast } = useToast();
 
@@ -161,6 +166,19 @@ export default function QuotesView() {
       window.removeEventListener('tribe_open_quote_draft' as any, handleOpenDraftEvent);
     };
   }, []);
+
+  // 3. Handle navigation from other views (e.g. Hub) with initialQuoteId
+  useEffect(() => {
+    if (initialQuoteId && quotes.length > 0) {
+      const match = quotes.find(q => q.id === initialQuoteId);
+      if (match) {
+        setEditingQuote(match);
+        setIsQuoteEditorOpen(true);
+        setActiveTab('quotes');
+        onInitialItemHandled?.();
+      }
+    }
+  }, [initialQuoteId, quotes, onInitialItemHandled]);
 
   // Filtered lists
   const query = searchQuery.toLowerCase().trim();

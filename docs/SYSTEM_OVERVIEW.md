@@ -137,16 +137,16 @@ Positioned immediately next to **Quotes** in the navigation bar, **Expenses** ma
 
 ### 1.12 User Guide & Public Try Page (`/try`)
 
-- **In-App User Guide (`GuideView.tsx`)** — 10 dedicated UK trade guides covering PWA Installation, Smart Convert & Magic Mic, Centralised Hub & 6 AM Morning Briefing, Quotes & Estimates, 1-Click Invoicing, Trade Calendar, Expenses & Receipt OCR, HMRC Self-Assessment & MTD Export, Materials & The Shed, and Van Fleet Maintenance. Includes an interactive side-by-side Free vs Premium comparison table and UK trade FAQs.
+- **In-App User Guide (`GuideView.tsx`)** — 10 dedicated UK trade guides covering PWA Installation, Smart Convert & Magic Mic, Centralised Hub & Briefing, Quotes & Estimates, 1-Click Invoicing, Trade Calendar, Expenses & Receipt OCR, HMRC Self-Assessment & MTD Export, Materials & The Shed, and Van Fleet Maintenance. Includes an interactive side-by-side Free vs Premium comparison table and UK trade FAQs.
 - **Dedicated Try Page (`TryTribePage.tsx`)** — Accessible at `/try`, `/trytribe`, `/try-tribe`, and `/overview`.
   - Features official TribeTrade branding with direct test CTAs and live feature spotlights.
   - **Embedded Interactive Trade Sandbox Tour** — Integrates a live 5-step interactive simulation directly into the page flow (`DashboardTour.tsx` with `isEmbedded={true}`) enabling visitors to test:
-    1. **Trade Hub Overview:** Live Apex Electrical greeting, weather, 6 AM briefing badge, site noticeboard, 3 booked jobs, quotes & billing pipeline, and van MOT/tax status.
-    2. **AI Smart Capture & Quote Drafting:** Instant parsing of a real WhatsApp enquiry into labour, materials, VAT, CIS, total £1,152.00, and a calendar booking.
-    3. **Magic Mic & 6 AM Morning Briefing:** Van stock dictation to The Shed, site survey scheduling, and a hands-free audio briefing player.
+    1. **Trade Hub Overview:** Live Apex Electrical greeting, weather, trade briefing badge, site noticeboard, 3 booked jobs, quotes & billing pipeline, and van MOT/tax status.
+    2. **AI Smart Capture & Quote Drafting:** Instant parsing of an enquiry into labour, materials, VAT, CIS, total £1,152.00, and a calendar booking.
+    3. **Magic Mic & Audio Briefing:** Van stock dictation to The Shed, site survey scheduling, and a hands-free audio briefing player.
     4. **Quotes, Invoicing & 1-Click Payments:** Itemised quote card #Q-1042, deposit tracking, 1-click invoice conversion #INV-2090, and CIS deductions.
     5. **Expenses, Receipt OCR & HMRC MTD Tax Prep:** Screwfix till slip OCR, £23.80 VAT extraction, HMRC Self-Assessment tax pot calculator, and MTD CSV download.
-  - **Integrated Feature Matrix & Pricing Section** — Side-by-side Free Tier (£0) vs Premium (£7.95/month or £79.00/year with a 14-day free trial).
+  - **Integrated Feature Matrix & Pricing Section** — Side-by-side Free Tier (£0) vs Premium (£7.95/month or £79.00/year with a 21-day free trial).
   - **Progressive Web App (PWA) Multi-Device Guide** — 1-tap installation guide for iPhone/iPad (Safari Add to Home Screen), Android (Chrome 1-tap install), and Desktop (Mac/Windows windowed app).
 
 ---
@@ -234,7 +234,7 @@ TribeTrade operates a **Reverse Trial** model powered by Stripe subscriptions:
 
 - **Premium Monthly:** £7.95 / month
 - **Premium Yearly:** £79.00 / year (saving £16.40/yr, equivalent to 2 months free)
-- **14-Day Reverse Trial:** Full Premium access upon registration without entering credit card or payment details.
+- **21-Day Reverse Trial:** Full Premium access upon registration without entering credit card or payment details.
 
 | Capability / Feature | Free Tier (£0 / Forever) | Premium Tier (£7.95/mo or £79/yr) |
 | :--- | :--- | :--- |
@@ -249,16 +249,16 @@ TribeTrade operates a **Reverse Trial** model powered by Stripe subscriptions:
 | **Trade Calendar & Reminders** | Manual calendar events | Automated reminders & Google Calendar sync |
 | **Fleet & MOT Tracking** | 1 vehicle compliance record | Unlimited vans & fleet vehicles |
 | **Materials & The Shed** | Up to 25 inventory items | Unlimited van stock & merchant search links |
-| **6 AM Morning Briefing** | Text only | Neural voice British English audio briefing |
+| **Trade Briefing & Audio** | Text only | Neural voice British English audio briefing |
 | **Magic Mic Hands-Free Audio** | Disabled | Included (van dictation & voice capture) |
 | **Work Tablet PIN Lock** | Included | Included |
 | **Trade UI Accent Themes** | Default theme only | All 9 trade accent colour themes |
 
 ### 3.2 Trial Mechanics
 
-1. On initial account creation, a `trialEndsAt` timestamp is written to `users/{uid}/private/billing` set to exactly 14 days from sign-up.
+1. On initial account creation, a `trialEndsAt` timestamp is written to `users/{uid}/private/billing` set to exactly 21 days from sign-up.
 2. The `useSubscriptionTier` hook listens in real-time to the user document, business hub document, and private billing document to evaluate active permissions.
-3. During the 14-day trial window, tradespeople receive full Premium access without credit card commitment.
+3. During the 21-day trial window, tradespeople receive full Premium access without credit card commitment.
 4. When the trial expires without a Stripe checkout, the account reverts automatically to the Free Tier.
 5. In the Free Tier, core tools remain operational (up to 3 quotes, manual invoicing, standard calendar, and 1 vehicle), while AI requests and MTD exports are gated with clear upgrade prompts.
 

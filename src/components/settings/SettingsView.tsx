@@ -1073,79 +1073,78 @@ export default function SettingsView({
               <div className="p-4 sm:p-6 pt-0 space-y-5 border-t border-zinc-100 dark:border-zinc-800/60 mt-2">
                 {/* Elevated Plan Status Card */}
                 <div className="p-5 sm:p-6 bg-gradient-to-br from-zinc-50 to-emerald-50/30 dark:from-zinc-800/60 dark:to-emerald-950/20 rounded-3xl border border-zinc-200 dark:border-zinc-800 space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[11px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
-                          {isTrial ? 'Current Trial' : subscriptionTier === 'premium' ? 'Active Membership' : 'Standard Account'}
-                        </span>
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                          subscriptionTier === 'premium' && !isTrial 
-                            ? 'bg-emerald-500 text-white' 
-                            : isTrial 
-                            ? 'bg-amber-500 text-white' 
-                            : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300'
-                        }`}>
-                          {isTrial ? '21-Day Trial' : subscriptionTier === 'premium' ? 'Premium' : 'Free'}
-                        </span>
-                      </div>
-                      <h3 className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white mt-1">
-                        {isTrial 
-                          ? 'Reverse Premium Trial' 
-                          : subscriptionTier === 'premium' 
-                          ? 'TribeTrade Solo Trader Premium' 
-                          : 'Free Basic Tier'}
-                      </h3>
-                      <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mt-1 max-w-xl">
-                        {isTrial 
-                          ? `You are currently enjoying full Premium access with ${trialDaysRemaining} ${trialDaysRemaining === 1 ? 'day' : 'days'} remaining on your trial.` 
-                          : subscriptionTier === 'premium' 
-                          ? 'Your subscription is active! You have full access to hands-free voice AI, briefings, van mileage, and MTD tax export.' 
-                          : 'Subscribe to Premium (£7.95/mo or £79/yr) to unlock AI Daily Briefings, Voice Readout, and Magic Mic AI.'}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
+                        {isTrial ? 'Current Trial' : subscriptionTier === 'premium' ? 'Active Membership' : 'Standard Account'}
+                      </span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                        subscriptionTier === 'premium' && !isTrial 
+                          ? 'bg-emerald-500 text-white' 
+                          : isTrial 
+                          ? 'bg-amber-500 text-white' 
+                          : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300'
+                      }`}>
+                        {isTrial ? '21-Day Trial' : subscriptionTier === 'premium' ? 'Premium' : 'Free'}
+                      </span>
+                    </div>
+                    <h3 className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white mt-1">
+                      {isTrial 
+                        ? 'Reverse Premium Trial' 
+                        : subscriptionTier === 'premium' 
+                        ? 'TribeTrade Solo Trader Premium' 
+                        : 'Free Basic Tier'}
+                    </h3>
+                    <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                      {isTrial 
+                        ? `You are currently enjoying full Premium access with ${trialDaysRemaining} ${trialDaysRemaining === 1 ? 'day' : 'days'} remaining on your trial.` 
+                        : subscriptionTier === 'premium' 
+                        ? 'Your subscription is active! You have full access to hands-free voice AI, briefings, van mileage, and MTD tax export.' 
+                        : 'Subscribe to Premium (£7.95/mo or £79/yr) to unlock AI Daily Briefings, Voice Readout, and Magic Mic AI.'}
+                    </p>
+                    {currentPeriodEnd && subscriptionTier === 'premium' && (
+                      <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 mt-2">
+                        {cancelAtPeriodEnd ? 'Access active until: ' : 'Renews on: '}
+                        {currentPeriodEnd.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                       </p>
-                      {currentPeriodEnd && subscriptionTier === 'premium' && (
-                        <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 mt-2">
-                          {cancelAtPeriodEnd ? 'Access active until: ' : 'Renews on: '}
-                          {currentPeriodEnd.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                        </p>
-                      )}
-                    </div>
+                    )}
+                  </div>
 
-                    <div className="shrink-0">
-                      {subscriptionTier === 'premium' && !isTrial ? (
+                  {/* Payment / Subscription Action Buttons placed below text */}
+                  <div className="pt-2 border-t border-zinc-200/60 dark:border-zinc-700/60">
+                    {subscriptionTier === 'premium' && !isTrial ? (
+                      <button
+                        onClick={handleManageSubscription}
+                        disabled={loadingCheckout}
+                        className="w-full sm:w-auto px-6 py-3.5 bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-xs font-black uppercase tracking-wider rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-2 shadow-md"
+                      >
+                        {loadingCheckout ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Loading...
+                          </>
+                        ) : (
+                          'Manage Subscription in Stripe'
+                        )}
+                      </button>
+                    ) : (
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                         <button
-                          onClick={handleManageSubscription}
+                          onClick={() => handleUpgrade('monthly')}
                           disabled={loadingCheckout}
-                          className="w-full sm:w-auto px-5 py-3 bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-xs font-black uppercase tracking-wider rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-2 shadow-md"
+                          className="w-full sm:w-auto px-6 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-2 shadow-md"
                         >
-                          {loadingCheckout ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              Loading...
-                            </>
-                          ) : (
-                            'Manage in Stripe'
-                          )}
+                          {loadingCheckout ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Subscribe Monthly (£7.95/mo)'}
                         </button>
-                      ) : (
-                        <div className="flex flex-col sm:flex-row items-center gap-2.5">
-                          <button
-                            onClick={() => handleUpgrade('monthly')}
-                            disabled={loadingCheckout}
-                            className="w-full sm:w-auto px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-2 shadow-md"
-                          >
-                            {loadingCheckout ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Subscribe Monthly (£7.95)'}
-                          </button>
-                          <button
-                            onClick={() => handleUpgrade('yearly')}
-                            disabled={loadingCheckout}
-                            className="w-full sm:w-auto px-5 py-3 bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-white text-xs font-black uppercase tracking-wider rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-2 border border-zinc-700"
-                          >
-                            {loadingCheckout ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Yearly (£79.00 / save 17%)'}
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                        <button
+                          onClick={() => handleUpgrade('yearly')}
+                          disabled={loadingCheckout}
+                          className="w-full sm:w-auto px-6 py-3.5 bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-white text-xs font-black uppercase tracking-wider rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-2 border border-zinc-700 shadow-md"
+                        >
+                          {loadingCheckout ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Subscribe Yearly (£79.00/yr • Save 17%)'}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1421,11 +1420,17 @@ export default function SettingsView({
                   value={businessForm.defaultHourlyRate === 0 ? '' : (businessForm.defaultHourlyRate ?? '')}
                   onChange={e => {
                     const val = e.target.value;
-                    setBusinessForm(prev => ({ ...prev, defaultHourlyRate: val === '' ? ('' as any) : parseFloat(val) || 0 }));
+                    const num = val === '' ? ('' as any) : parseFloat(val) || 0;
+                    const autoDayRate = typeof num === 'number' && num > 0 ? Math.round(num * 8) : (val === '' ? ('' as any) : 0);
+                    setBusinessForm(prev => ({ 
+                      ...prev, 
+                      defaultHourlyRate: num,
+                      defaultDayRate: autoDayRate
+                    }));
                   }}
                   onBlur={() => {
                     if (!businessForm.defaultHourlyRate) {
-                      setBusinessForm(prev => ({ ...prev, defaultHourlyRate: 45 }));
+                      setBusinessForm(prev => ({ ...prev, defaultHourlyRate: 45, defaultDayRate: 360 }));
                     }
                   }}
                   placeholder="45"
@@ -1433,7 +1438,7 @@ export default function SettingsView({
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 mb-1">Standard Day Rate (£/day)</label>
+                <label className="block text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 mb-1">Standard Day Rate (£/day - 8 hrs)</label>
                 <input
                   type="number"
                   min="0"
@@ -1445,10 +1450,11 @@ export default function SettingsView({
                   }}
                   onBlur={() => {
                     if (!businessForm.defaultDayRate) {
-                      setBusinessForm(prev => ({ ...prev, defaultDayRate: 320 }));
+                      const hourly = Number(businessForm.defaultHourlyRate) || 45;
+                      setBusinessForm(prev => ({ ...prev, defaultDayRate: Math.round(hourly * 8) }));
                     }
                   }}
-                  placeholder="320"
+                  placeholder="360"
                   className="w-full px-3.5 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>

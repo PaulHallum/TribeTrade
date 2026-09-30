@@ -102,23 +102,23 @@ export default function GuideView({
       title: 'Smart Convert & Magic Mic',
       icon: Sparkles,
       color: 'text-amber-500 bg-amber-50 dark:bg-amber-950/20',
-      description: 'Turn unstructured text, WhatsApp messages, or spoken audio into quotes, jobs, and tasks in seconds.',
+      description: 'Turn spoken audio, typed notes, or text copied from WhatsApp or site messages into quotes, jobs, and tasks in seconds.',
       steps: [
         'Tap the "Smart Convert" button or the Magic Mic button at the bottom of the screen while in the van or on site.',
-        'Speak or paste naturally: "Quote for Dave for bathroom tiling, 2 days labour at £250 and £80 for grout and adhesive."',
+        'Speak naturally or paste text (you can copy text or customer WhatsApp messages and paste them straight in): "Quote for Dave for bathroom tiling, 2 days labour at £250 and £80 for grout and adhesive."',
         'Gemini AI extracts client names, job titles, labour days, and consumable items into structured quote items.',
         'Review the processed preview to adjust rates, dates, and details before saving or sharing with the client in one click.'
       ]
     },
     {
-      title: 'Centralised Hub & 6 AM Morning Briefing',
+      title: 'Centralised Hub & Briefing',
       icon: LayoutDashboard,
       color: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-950/20',
-      description: 'Your morning trade control centre. Get an instant overview of jobs, weather on site, and pending quotes.',
+      description: 'Your trade control centre. Get an on-demand overview of jobs, weather on site, and pending quotes at any time.',
       steps: [
         'Open the Hub to see today\'s scheduled site visits, urgent tasks, van MOT/tax status, and live revenue tracking.',
-        'Tap "Briefing" (Sparkles icon) in the Hub header to trigger Gemini AI to synthesise your day into a concise trade update.',
-        'Listen to your audio briefing directly on your van speakers while driving to your first job.',
+        'Tap "Briefing" (Sparkles icon) in the Hub header anytime to trigger Gemini AI to synthesise your day into a concise trade update.',
+        'Listen to your audio briefing directly on your van speakers while driving between jobs.',
         'Includes site weather forecasts so you know when outdoor jobs need sheeting or indoor work should be prioritised.'
       ]
     },
@@ -217,7 +217,7 @@ export default function GuideView({
     { name: '1-Click Quote-to-Invoice Conversion', free: 'Basic manual invoice', premium: 'Unlimited 1-Click Conversions', highlight: true },
     { name: 'Instant PDF Generation & WhatsApp/Client Sharing', free: 'Standard PDF', premium: 'Branded PDF with 20% Deposit & CIS', highlight: true },
     { name: 'Receipt OCR & Till Slip Scanning (Screwfix, Shell, etc.)', free: 'Manual entry only', premium: 'Unlimited AI Receipt OCR', highlight: true },
-    { name: '6 AM Trade Morning Briefing & Studio Voice Narration', free: 'Not included', premium: 'Daily AI Briefing + Studio HD Audio', highlight: true },
+    { name: 'On-Demand Trade Briefing & Studio Voice Narration', free: 'Not included', premium: 'Daily AI Briefing + Studio HD Audio', highlight: true },
     { name: 'Magic Mic Hands-Free Van Voice Assistant', free: 'Manual typing only', premium: 'Full Natural Language Voice AI', highlight: true },
     { name: 'HMRC Self-Assessment Tax & CIS Calculation', free: 'Basic totals', premium: 'Full SA103 Liability, NI & CIS Offset', highlight: true },
     { name: 'Making Tax Digital (MTD) Accountant CSV Export', free: 'Not included', premium: '1-Click Compliant CSV Export', highlight: true },
@@ -362,7 +362,7 @@ export default function GuideView({
                 <div>
                   <h5 className="font-bold text-zinc-800 dark:text-zinc-200 mb-1">❓ What is the difference between Free and Premium?</h5>
                   <p>
-                    The <strong>Free Tier</strong> gives you full manual trade tools for quotes, invoices, calendar, expenses, and materials pick lists. <strong>Premium (£7.95/mo or £79/yr)</strong> unlocks full AI capabilities: 6 AM Morning Audio Briefings, hands-free Magic Mic dictation, instant merchant receipt OCR scanning, Making Tax Digital (MTD) CSV export, and vehicle maintenance alerts.
+                    The <strong>Free Tier</strong> gives you full manual trade tools for quotes, invoices, calendar, expenses, and materials pick lists. <strong>Premium (£7.95/mo or £79/yr)</strong> unlocks full AI capabilities: On-Demand Audio Briefings, hands-free Magic Mic dictation, instant merchant receipt OCR scanning, Making Tax Digital (MTD) CSV export, and vehicle maintenance alerts.
                   </p>
                 </div>
 
@@ -536,14 +536,14 @@ export default function GuideView({
                     <span className="text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-wider ml-1 bg-amber-500/10 px-1.5 py-0.5 rounded-full border border-amber-500/20">(Save with yearly — 2 Months Free!)</span>
                   </div>
                 </div>
-                <p className="text-xs text-zinc-500 mt-2 font-medium">Complete AI-powered trade business suite with 6 AM Briefings, Voice Readout, Quotes, Receipt OCR, and HMRC Tax calculations.</p>
+                <p className="text-xs text-zinc-500 mt-2 font-medium">Complete AI-powered trade business suite with Audio Briefings, Voice Readout, Quotes, Receipt OCR, and HMRC Tax calculations.</p>
                 
                 <hr className="my-6 border-zinc-200 dark:border-zinc-800" />
                 
                 <ul className="space-y-3.5 text-xs">
                   <li className="flex items-center gap-2.5 text-zinc-650 dark:text-zinc-300">
                     <Check className="w-4 h-4 text-emerald-500 shrink-0" />
-                    <span className="font-semibold text-zinc-800 dark:text-white">AI Daily Morning Briefing with Studio HD Audio*</span>
+                    <span className="font-semibold text-zinc-800 dark:text-white">AI Daily Briefing with Studio HD Audio*</span>
                   </li>
                   <li className="flex items-center gap-2.5 text-zinc-650 dark:text-zinc-300">
                     <Check className="w-4 h-4 text-emerald-500 shrink-0" />

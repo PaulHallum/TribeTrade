@@ -29,7 +29,7 @@ Visitors do **NOT** need to register, log in, download an app, or enter a credit
    - 🍲 **Weekly Meal Planning:** Shows recipes and 1-tap grocery list population.
    - 🚗 **Weekend Logistics:** Triggers instant clash detection when two kids have overlapping activities.
    - 📌 **Fridge Noticeboard:** Displays digital emergency contacts, babysitter guides, and WiFi cards.
-3. **Frictionless Onboarding CTA:** Big, prominent *"Start 14-Day Free Trial (No Card Needed)"* button right above and below the demo.
+3. **Frictionless Onboarding CTA:** Big, prominent *"Start 21-Day Free Trial (No Card Needed)"* button right above and below the demo.
 
 **Rule of Thumb for Every Social Post:** Always direct parents to **`https://tribefamilyhub.uk/try`**!
 

@@ -81,7 +81,7 @@ export default function TryTribePage() {
               href="/?action=signup" 
               className="px-8 py-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-base shadow-xl shadow-emerald-600/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
             >
-              Start 14-Day Free Trial
+              Start 21-Day Free Trial
             </a>
             <button 
               onClick={() => {
@@ -137,9 +137,9 @@ export default function TryTribePage() {
               <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600">
                 <Volume2 className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold text-zinc-950">6 AM Daily Trade Briefing & Voice Readout</h3>
+              <h3 className="text-lg font-bold text-zinc-950">Daily Trade Briefing & Voice Readout</h3>
               <p className="text-xs text-zinc-600 leading-relaxed">
-                Start your morning with an automated AI summary of site appointments, weather on site, and materials needed. Listen hands-free in your van while driving to your first job.
+                Run an automated AI audio briefing anytime of site appointments, weather on site, and materials needed. Listen hands-free in your van while driving between jobs.
               </p>
             </div>
 
@@ -234,7 +234,7 @@ export default function TryTribePage() {
               </span>
               <span className="text-zinc-300">•</span>
               <span className="inline-flex items-center gap-1.5 bg-teal-50 border border-teal-200 text-teal-800 px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-bold">
-                <ShieldCheck className="w-4 h-4 text-teal-600" /> 14-Day Free Trial
+                <ShieldCheck className="w-4 h-4 text-teal-600" /> 21-Day Free Trial
               </span>
             </div>
             
@@ -247,7 +247,7 @@ export default function TryTribePage() {
                 href="/?action=signup" 
                 className="px-8 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-sm sm:text-base shadow-lg shadow-emerald-600/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
               >
-                Start 14-Day Free Trial
+                Start 21-Day Free Trial
               </a>
             </div>
           </div>
@@ -416,7 +416,7 @@ export default function TryTribePage() {
         <footer className="text-center space-y-6 pt-8 border-t border-zinc-200">
           <h2 className="text-3xl sm:text-4xl font-black text-zinc-950">Ready to Take Control of Your Trade Business?</h2>
           <p className="text-zinc-600 text-sm max-w-md mx-auto">
-            Try TribeTrade risk-free with our 14-day trial. No credit card required upfront, no auto-billing traps. Full premium access.
+            Try TribeTrade risk-free with our 21-day trial. No credit card required upfront, no auto-billing traps. Full premium access.
           </p>
           <div className="pt-2 flex flex-wrap items-center justify-center gap-4">
             <a 

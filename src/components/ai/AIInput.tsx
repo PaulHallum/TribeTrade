@@ -13,6 +13,8 @@ import { useToast } from '../../contexts/ToastContext';
 import { useAuth } from '../../App';
 import { db } from '../../lib/firebase';
 import { collection, addDoc, onSnapshot, updateDoc, doc, getCountFromServer, getDoc, getDocs } from 'firebase/firestore';
+import { generateNextQuoteNumber } from '../../services/quoteService';
+import { Quote } from '../../types/quote';
 import { useSubscriptionTier } from '../../hooks/useSubscriptionTier';
 import { syncToGoogleCalendar } from '../../services/googleCalendar';
 import CameraChoiceModal from '../common/CameraChoiceModal';
@@ -477,7 +479,15 @@ export default function AIInput() {
 
           // Sequential reference number
           const quotesSnap = await getDocs(collection(db, 'trade_users', tradeUserId, 'quotes'));
-          const nextNumber = `Q-${1001 + quotesSnap.size}`;
+          const existingQuotes = quotesSnap.docs.map(d => ({ id: d.id, ...d.data() } as Quote));
+          const nextNumber = generateNextQuoteNumber(existingQuotes, businessData?.highestQuoteNumber);
+          const matchNum = nextNumber.match(/(\d+)/);
+          if (matchNum) {
+            const num = parseInt(matchNum[1], 10);
+            if (!isNaN(num) && num > (businessData?.highestQuoteNumber || 1000)) {
+              await updateDoc(doc(db, 'trade_users', tradeUserId), { highestQuoteNumber: num }).catch(() => {});
+            }
+          }
 
           // Format items into structured QuoteItems
           const rawItems = Array.isArray(data.items) ? data.items : [];
@@ -520,7 +530,7 @@ export default function AIInput() {
             customerEmail: data.customerEmail || '',
             customerAddress: data.customerAddress || '',
             jobTitle: data.jobTitle || 'Trade Works',
-            jobDescription: data.notes || '',
+            jobDescription: data.jobDescription || data.description || data.notes || '',
             items: quoteItems,
             subtotalLabour: subLabour,
             subtotalMaterials: subMat,
@@ -530,7 +540,7 @@ export default function AIInput() {
             vatAmount: vat,
             grandTotal: grand,
             paymentTerms: businessData?.defaultPaymentTerms || 'Payment due within 14 days of completion.',
-            notes: data.notes || businessData?.defaultQuoteTerms || 'Quotation valid for 30 days. Materials subject to supplier price changes.',
+            notes: businessData?.defaultQuoteTerms || 'Quotation valid for 30 days. Materials subject to supplier price changes.',
             authorId: user.uid,
             createdAt: new Date().toISOString()
           };
@@ -619,15 +629,30 @@ export default function AIInput() {
                   </span>
                 )}
               </div>
-              <button 
-                onClick={() => {
-                  stopListening();
-                  setShowChat(false);
-                }}
-                className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-full transition-colors text-zinc-400"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-1.5">
+                {messages.length > 0 && (
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setMessages([]);
+                      showToast('Conversation cleared', 'info');
+                    }}
+                    className="px-2.5 py-1 text-[10px] font-bold text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-white rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                    title="Clear chat history"
+                  >
+                    Clear
+                  </button>
+                )}
+                <button 
+                  onClick={() => {
+                    stopListening();
+                    setShowChat(false);
+                  }}
+                  className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-full transition-colors text-zinc-400"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
             
             <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide">

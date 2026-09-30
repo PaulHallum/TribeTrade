@@ -119,35 +119,35 @@ export default function AuthScreen() {
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
-        className="relative z-10 max-w-sm w-full px-8 text-center"
+        className="relative z-10 max-w-sm w-full px-4 sm:px-8 text-center"
       >
-        <div className="mb-6 flex justify-center">
+        <div className="mb-3 sm:mb-6 flex justify-center">
           <div className="relative">
-            <div className="w-32 h-32 flex items-center justify-center overflow-hidden">
+            <div className="w-20 h-20 sm:w-28 sm:h-28 flex items-center justify-center overflow-hidden">
               <img src="/logo.png" alt="Tribe Logo" className="w-full h-full object-contain" />
             </div>
-            <div className="absolute -top-2 -right-2 w-7 h-7 bg-white dark:bg-zinc-800 rounded-full flex items-center justify-center border border-zinc-100 dark:border-zinc-800">
-              <div className="w-3.5 h-3.5 bg-emerald-500 rounded-full animate-pulse" />
+            <div className="absolute -top-1.5 -right-1.5 w-6 h-6 sm:w-7 sm:h-7 bg-white dark:bg-zinc-800 rounded-full flex items-center justify-center border border-zinc-100 dark:border-zinc-800">
+              <div className="w-3 h-3 sm:w-3.5 sm:h-3.5 bg-emerald-500 rounded-full animate-pulse" />
             </div>
           </div>
         </div>
         
-        <div className="space-y-2 mb-6 mt-2">
-          <h1 className="text-xl font-black text-zinc-900 dark:text-white tracking-tight">TribeTrade</h1>
+        <div className="space-y-1 sm:space-y-2 mb-4 sm:mb-6">
+          <h1 className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white tracking-tight">TribeTrade</h1>
           <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 max-w-xs mx-auto">
-            The intelligent business command centre for tradespeople: manage job diaries, tasks & materials, client notes, and daily AI briefings.
+            The intelligent business command centre for tradespeople: job diary, quotes & invoices, van mileage, and AI trade briefings.
           </p>
         </div>
 
-        {/* Feature Highlights */}
-        <div className="grid grid-cols-2 gap-2 mb-6 text-left">
+        {/* Feature Highlights - visible on tablet/desktop to save mobile vertical height */}
+        <div className="hidden sm:grid grid-cols-2 gap-2 mb-6 text-left">
           <div className="bg-zinc-50 dark:bg-zinc-900/80 p-2.5 rounded-2xl border border-zinc-150 dark:border-zinc-800">
             <div className="text-[11px] font-bold text-zinc-800 dark:text-zinc-200">📅 Job Diary</div>
             <div className="text-[10px] text-zinc-500 dark:text-zinc-400">Sync Google, Outlook & Apple</div>
           </div>
           <div className="bg-zinc-50 dark:bg-zinc-900/80 p-2.5 rounded-2xl border border-zinc-150 dark:border-zinc-800">
-            <div className="text-[11px] font-bold text-zinc-800 dark:text-zinc-200">✨ Morning Brief</div>
-            <div className="text-[10px] text-zinc-500 dark:text-zinc-400">Daily intelligent summaries & voice</div>
+            <div className="text-[11px] font-bold text-zinc-800 dark:text-zinc-200">✨ Daily Briefing</div>
+            <div className="text-[10px] text-zinc-500 dark:text-zinc-400">On-demand audio summaries & voice</div>
           </div>
           <div className="bg-zinc-50 dark:bg-zinc-900/80 p-2.5 rounded-2xl border border-zinc-150 dark:border-zinc-800">
             <div className="text-[11px] font-bold text-zinc-800 dark:text-zinc-200">✅ Jobs & Milestones</div>
@@ -160,8 +160,8 @@ export default function AuthScreen() {
         </div>
 
         {/* Supported Email Account Sign In Options */}
-        <div className="space-y-3 mb-6">
-          <div className="text-xs font-extrabold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-3">
+        <div className="space-y-2.5 sm:space-y-3 mb-6">
+          <div className="text-xs font-extrabold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-2 sm:mb-3">
             Select your email account to sign in:
           </div>
 

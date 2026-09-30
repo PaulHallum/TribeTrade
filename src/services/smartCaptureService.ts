@@ -46,6 +46,7 @@ export interface SmartConversionResult {
       customerName?: string;
       customerAddress?: string;
       customerPhone?: string;
+      customerEmail?: string;
       jobTitle?: string;
       jobDescription?: string;
       merchant?: string;
@@ -179,6 +180,7 @@ RULES:
        "customerName": "Customer name or 'Prospective Client'",
        "customerAddress": "Site address or postcode if mentioned",
        "customerPhone": "Phone if mentioned",
+       "customerEmail": "Customer email if present in email sender header or body",
        "jobTitle": "Short descriptive job summary (e.g. 'Kitchen Rewire' or 'Boiler Replacement')",
        "jobDescription": "Full scope of works outlined",
        "items": [

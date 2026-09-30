@@ -59,7 +59,7 @@ TribeTrade is frequently installed on a dedicated tablet kept in the van or work
 
 ## 4. Free vs Premium Subscription: Features & Limits
 
-TribeTrade operates on a straightforward, transparent model. Every new user enjoys an unrestricted **14-day free trial** of all Premium AI features. After the trial, you can continue on the **Free Tier (£0 forever)** or upgrade to **Premium** at £7.95/month (or £79.00/year, saving 17% with 2 months free).
+TribeTrade operates on a straightforward, transparent model. Every new user enjoys an unrestricted **21-day free trial** of all Premium AI features. After the trial, you can continue on the **Free Tier (£0 forever)** or upgrade to **Premium** at £7.95/month (or £79.00/year, saving 17% with 2 months free).
 
 ### Side-by-Side Feature Comparison
 
@@ -69,9 +69,9 @@ TribeTrade operates on a straightforward, transparent model. Every new user enjo
 | **Active Quotes Pipeline** | Up to 3 active quotes | **Unlimited Quotes & PDF Generation** |
 | **Tax Invoicing** | Manual invoicing | **1-Click Conversion from Quotes & CIS Tracking** |
 | **Job Scheduling & Calendar** | Full manual calendar | **Automated Duration Booking & Reminders** |
-| **AI Smart Capture** | 3 trial scans | **50 Daily Scans (WhatsApp, voice, notes)** |
+| **AI Smart Capture** | 3 trial scans | **50 Daily Scans (Voice, notes, copied messages)** |
 | **Magic Mic Dictation** | Basic manual notes | **Hands-Free Speech-to-Text Van Dictation** |
-| **6 AM Daily Trade Briefing** | Text-only dashboard | **Studio HD Voice Commute Audio Briefing** |
+| **On-Demand Trade Briefing** | Text-only dashboard | **Studio HD Voice Commute Audio Briefing** |
 | **Receipt OCR & VAT Extraction** | Manual expense logging | **Auto-Extract 20% VAT from Till Receipts** |
 | **HMRC Tax & MTD Prep** | Basic expense ledger | **Live Self-Assessment Pot & MTD CSV Export** |
 | **The Shed (Van Inventory)** | Up to 25 stock items | **Unlimited Inventory & Reorder Links** |

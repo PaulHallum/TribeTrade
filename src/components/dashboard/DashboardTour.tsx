@@ -190,11 +190,11 @@ export default function DashboardTour({
       icon: FileText,
       color: 'from-emerald-500 to-teal-600',
     },
-    // Step 2: Magic Mic Voice Assistant & 6 AM Audio Briefings
+    // Step 2: Magic Mic Voice Assistant & Audio Briefings
     {
       badge: isTryTribeView ? 'Interactive Tour • Step 3 of 5' : 'Interactive Tour • Step 3 of 6',
-      title: 'Magic Mic & 6 AM Audio Briefings',
-      subtitle: 'Dictate van notes and material orders hands-free, and listen to morning trade summaries.',
+      title: 'Magic Mic & Audio Briefings',
+      subtitle: 'Dictate van notes and material orders hands-free, and listen to on-demand trade summaries.',
       icon: Mic,
       color: 'from-rose-500 to-pink-600',
     },
@@ -288,7 +288,7 @@ export default function DashboardTour({
                   </div>
                   <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-bold shrink-0 shadow-xs">
                     <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
-                    <span>6 AM Trade Briefing Ready</span>
+                    <span>Trade Briefing Ready</span>
                   </div>
                 </div>
 
@@ -844,8 +844,8 @@ export default function DashboardTour({
                       <Volume2 className="w-5 h-5" />
                     </div>
                     <div>
-                      <div className="text-[10px] font-black text-amber-400 uppercase tracking-widest">6 AM Daily Trade Briefing</div>
-                      <div className="text-xs font-bold text-white">Your Morning Commute Summary</div>
+                      <div className="text-[10px] font-black text-amber-400 uppercase tracking-widest">Daily Trade Briefing</div>
+                      <div className="text-xs font-bold text-white">Your On-Demand Audio Summary</div>
                     </div>
                   </div>
                   <button
@@ -1585,7 +1585,7 @@ export default function DashboardTour({
                       className="px-5 py-2.5 rounded-xl text-xs font-bold text-white shadow-lg bg-emerald-600 hover:bg-emerald-700 transition-all flex items-center gap-2 active:scale-98"
                     >
                       <Check className="w-4 h-4 stroke-[3]" />
-                      Start 14-Day Free Trial
+                      Start 21-Day Free Trial
                     </a>
                   </div>
                 ) : (

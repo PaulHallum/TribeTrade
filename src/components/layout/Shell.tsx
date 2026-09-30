@@ -196,19 +196,18 @@ export default function Shell() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Sync state to history when changed manually (e.g. via nav buttons)
-  const navigateToView = (view: View, tab: string | null = null) => {
-    if (activeView === view && activeTab === tab) return;
+  const navigateToView = (view: View, tab: string | null = null, itemId: string | null = null) => {
+    if (activeView === view && activeTab === tab && initialItemId === itemId) return;
     
     // Clear search params and update the URL path to match the view
     const url = new URL(window.location.href);
     url.search = '';
     url.pathname = view === 'hub' ? '/' : `/${view}`;
-    window.history.pushState({ view, tab }, '', url.toString());
+    window.history.pushState({ view, tab, itemId }, '', url.toString());
     
     setActiveView(view);
     setActiveTab(tab);
-    setInitialItemId(null);
+    setInitialItemId(itemId);
   };
 
   useEffect(() => {
@@ -738,7 +737,7 @@ export default function Shell() {
                 {activeView === 'hub' && (
                   <ErrorBoundary name="Dashboard">
                     <Suspense fallback={<div className="flex justify-center p-12"><Loader2 className="w-8 h-8 animate-spin text-emerald-500" /></div>}>
-                      <Hub onNavigate={(view, tab) => navigateToView(view as any, tab)} onGenerateBriefing={handleGenerateBriefing} />
+                      <Hub onNavigate={(view, tab, itemId) => navigateToView(view as any, tab, itemId)} onGenerateBriefing={handleGenerateBriefing} />
                     </Suspense>
                   </ErrorBoundary>
                 )}
@@ -752,7 +751,7 @@ export default function Shell() {
                 {activeView === 'quotes' && (
                   <ErrorBoundary name="Quotes">
                     <Suspense fallback={<div className="flex justify-center p-12"><Loader2 className="w-8 h-8 animate-spin text-emerald-500" /></div>}>
-                      <QuotesView />
+                      <QuotesView initialQuoteId={initialItemId} onInitialItemHandled={() => setInitialItemId(null)} />
                     </Suspense>
                   </ErrorBoundary>
                 )}

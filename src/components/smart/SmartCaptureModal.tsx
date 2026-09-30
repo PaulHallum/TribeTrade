@@ -21,7 +21,9 @@ import { useSettings } from '../../contexts/SettingsContext';
 import { processSmartCapture, SmartConversionResult } from '../../services/smartCaptureService';
 import { addOrUpdateShedStock } from '../../services/shedService';
 import { db } from '../../lib/firebase';
-import { collection, addDoc, updateDoc, getCountFromServer, doc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, getCountFromServer, doc, getDoc, getDocs } from 'firebase/firestore';
+import { generateNextQuoteNumber } from '../../services/quoteService';
+import { Quote } from '../../types/quote';
 import { syncToGoogleCalendar } from '../../services/googleCalendar';
 import { useAuth } from '../../App';
 import { logger } from '../../services/logger';
@@ -334,39 +336,96 @@ export default function SmartCaptureModal({
           dataToSave.category = item.data.category || 'Materials / The Shed';
           dataToSave.checked = false;
         } else if (item.action === 'CREATE_QUOTE') {
-          dataToSave.quoteNumber = `Q-${Math.floor(1000 + Math.random() * 9000)}`;
+          // 1. Sequential Quote Numbering
+          let nextQuoteNumber = 'Q-1001';
+          let businessData: any = {};
+          try {
+            const tradeUserSnap = await getDoc(doc(db, 'trade_users', tradeUserId));
+            businessData = tradeUserSnap.exists() ? tradeUserSnap.data() : {};
+            const quotesSnap = await getDocs(collection(db, 'trade_users', tradeUserId, 'quotes'));
+            const existingQuotes = quotesSnap.docs.map(d => ({ id: d.id, ...d.data() } as Quote));
+            nextQuoteNumber = generateNextQuoteNumber(existingQuotes, businessData?.highestQuoteNumber);
+            const matchNum = nextQuoteNumber.match(/(\d+)/);
+            if (matchNum) {
+              const num = parseInt(matchNum[1], 10);
+              if (!isNaN(num) && num > (businessData?.highestQuoteNumber || 1000)) {
+                await updateDoc(doc(db, 'trade_users', tradeUserId), { highestQuoteNumber: num }).catch(() => {});
+              }
+            }
+          } catch (numErr) {
+            logger.warn('Failed to generate sequential quote number:', numErr);
+          }
+
+          // 2. Extract Customer Email from item data or raw email text
+          let extractedEmail = item.data.customerEmail || '';
+          if (!extractedEmail && input.text) {
+            const fromMatch = input.text.match(/From:\s*(?:[^<\n]*<)?([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})>?/i);
+            if (fromMatch && fromMatch[1]) {
+              extractedEmail = fromMatch[1].trim();
+            } else {
+              const emailMatch = input.text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+              if (emailMatch && emailMatch[0]) {
+                extractedEmail = emailMatch[0].trim();
+              }
+            }
+          }
+
+          dataToSave.quoteNumber = nextQuoteNumber;
           dataToSave.customerName = item.data.customerName || item.data.title || 'Client Quotation';
           dataToSave.customerPhone = item.data.customerPhone || '';
-          dataToSave.customerEmail = item.data.customerEmail || '';
+          dataToSave.customerEmail = extractedEmail;
           dataToSave.customerAddress = item.data.customerAddress || item.data.location || '';
           dataToSave.jobTitle = item.data.jobTitle || item.data.title || 'Trade Works';
-          dataToSave.jobDescription = item.data.description || item.data.notes || '';
+          dataToSave.jobDescription = item.data.jobDescription || item.data.description || item.data.notes || '';
           dataToSave.status = 'draft';
           dataToSave.dateIssued = new Date().toISOString().split('T')[0];
           const validDate = new Date();
           validDate.setDate(validDate.getDate() + 30);
           dataToSave.validUntil = validDate.toISOString().split('T')[0];
+          dataToSave.paymentTerms = businessData?.defaultPaymentTerms || 'Payment due within 14 days of completion.';
+          dataToSave.notes = businessData?.defaultQuoteTerms || 'Quotation valid for 30 days. Materials subject to supplier price changes.';
+
           const estimatedCost = typeof item.data.estimatedTotal === 'number' 
             ? item.data.estimatedTotal 
             : typeof item.data.amount === 'number' 
             ? item.data.amount 
             : 0;
-          dataToSave.items = item.data.items || [
-            {
-              id: `item_${Date.now()}`,
-              description: item.data.description || item.data.title || 'Quoted work items from note scribble',
-              type: 'labour',
-              quantity: 1,
-              unit: '1 day',
-              unitPrice: estimatedCost,
-              total: estimatedCost
-            }
-          ];
-          dataToSave.subtotalLabour = estimatedCost;
-          dataToSave.subtotalMaterials = 0;
-          dataToSave.netTotal = estimatedCost;
-          dataToSave.vatAmount = 0;
-          dataToSave.grandTotal = estimatedCost;
+
+          dataToSave.items = Array.isArray(item.data.items) && item.data.items.length > 0
+            ? item.data.items.map((it: any, idx: number) => ({
+                id: it.id || `item_${Date.now()}_${idx}_${Math.random().toString(36).substr(2, 7)}`,
+                description: it.description || it.name || 'Trade item',
+                type: (it.type === 'material' || it.type === 'labour' || it.type === 'hire' || it.type === 'other') ? it.type : 'labour',
+                quantity: Number(it.quantity) || 1,
+                unit: it.unit || (it.type === 'labour' ? '1 day' : 'units'),
+                unitPrice: Number(it.unitPrice) || 0,
+                total: Number(it.total) || Number(((Number(it.quantity) || 1) * (Number(it.unitPrice) || 0)).toFixed(2))
+              }))
+            : [
+                {
+                  id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 7)}`,
+                  description: item.data.description || item.data.notes || item.data.title || 'Quoted work items from note scribble',
+                  type: 'labour',
+                  quantity: 1,
+                  unit: '1 day',
+                  unitPrice: estimatedCost,
+                  total: estimatedCost
+                }
+              ];
+
+          const subLabour = dataToSave.items.filter((it: any) => it.type === 'labour').reduce((s: number, it: any) => s + (it.total || 0), 0);
+          const subMat = dataToSave.items.filter((it: any) => it.type !== 'labour').reduce((s: number, it: any) => s + (it.total || 0), 0);
+          const net = subLabour + subMat;
+          const isVat = businessData?.isVatRegistered || false;
+          const vatRate = businessData?.defaultVatRate || 20;
+          const vat = isVat ? Number(((net * vatRate) / 100).toFixed(2)) : 0;
+          dataToSave.subtotalLabour = subLabour;
+          dataToSave.subtotalMaterials = subMat;
+          dataToSave.netTotal = net;
+          dataToSave.isVatRegistered = isVat;
+          dataToSave.vatRate = vatRate;
+          dataToSave.vatAmount = vat;
+          dataToSave.grandTotal = Number((net + vat).toFixed(2));
         } else if (item.action === 'CREATE_NOTE') {
           dataToSave.title = item.data.title || 'Extracted Note';
           dataToSave.content = item.data.content || item.data.description || 'No content';

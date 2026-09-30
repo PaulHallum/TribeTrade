@@ -33,7 +33,7 @@ import {
   TransactionCategoryKey
 } from '../../types/transaction';
 import { MileageEntry, HMRC_STANDARD_MILEAGE_RATE } from '../../types/vehicle';
-import { subscribeMileageEntries } from '../../services/mileageService';
+import { subscribeMileageEntries, generateMileageCsv } from '../../services/mileageService';
 import { BusinessDetails, DEFAULT_BUSINESS_DETAILS } from '../../types/quote';
 import { subscribeBusinessDetails } from '../../services/quoteService';
 import {
@@ -60,6 +60,7 @@ export default function ExpensesView() {
   const { user, tradeUserId } = useAuth();
   const { showToast } = useToast();
 
+  const [activeTab, setActiveTab] = useState<'expenses' | 'mileage'>('expenses');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [businessDetails, setBusinessDetails] = useState<BusinessDetails>(DEFAULT_BUSINESS_DETAILS);
   const [loading, setLoading] = useState(true);
@@ -283,12 +284,39 @@ export default function ExpensesView() {
 
   return (
     <div className="max-w-7xl mx-auto pb-32 px-2 sm:px-4 space-y-6">
+      {/* Page Header with Segmented Toggle for Expenses & Van Mileage */}
       <PageHeader
-        icon={ReceiptPoundSterling}
-        title="Expenses & Bookkeeping"
-        subtitle="Track income, scan trade receipts, and export HMRC Making Tax Digital (MTD) records"
+        icon={activeTab === 'expenses' ? ReceiptPoundSterling : Truck}
+        title={activeTab === 'expenses' ? 'Expenses & Bookkeeping' : 'Van Mileage'}
+        subtitle={activeTab === 'expenses' ? 'Track income, scan trade receipts, and export HMRC Making Tax Digital (MTD) records' : 'HMRC-compliant 45p/mile vehicle log & tax deduction calculator'}
+        extra={
+          <div className="bg-gradient-to-r from-emerald-500/10 to-amber-500/10 border border-emerald-500/20 dark:border-emerald-400/10 p-1 rounded-2xl flex gap-1 shadow-sm">
+            <button 
+              onClick={() => setActiveTab('expenses')}
+              className={`px-3 sm:px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                activeTab === 'expenses' 
+                  ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm' 
+                  : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200'
+              }`}
+            >
+              Expenses
+            </button>
+            <button 
+              onClick={() => setActiveTab('mileage')}
+              className={`px-3 sm:px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                activeTab === 'mileage' 
+                  ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm' 
+                  : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200'
+              }`}
+            >
+              Van Mileage
+            </button>
+          </div>
+        }
       />
 
+      {activeTab === 'expenses' ? (
+        <>
       {/* Top Financial Snapshot Cards - 2x2 on mobile, 4-across on desktop */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
         {/* Total Income */}
@@ -366,7 +394,7 @@ export default function ExpensesView() {
         </div>
       </div>
 
-      {/* Main Action Bar - 3 evenly spaced options across the page */}
+      {/* Main Action Bar */}
       <div className="grid grid-cols-3 gap-2 sm:gap-3">
         {/* Scan Receipt Button */}
         <button
@@ -386,91 +414,15 @@ export default function ExpensesView() {
           <span className="truncate">Manual Entry</span>
         </button>
 
-        {/* Van Mileage Log Button */}
+        {/* Self Assessment / Tax Return Button */}
         <button
-          onClick={() => setIsMileageLogOpen(true)}
-          className="flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2.5 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-amber-800 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/60 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-bold shadow-sm transition-all active:scale-95"
-          title="Open Van Mileage Log (HMRC Compliant 45p/mile)"
+          onClick={() => setIsSelfAssessmentOpen(true)}
+          className="flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700/80 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-bold shadow-sm transition-all active:scale-95"
+          title="Self Assessment Tax Return Estimator"
         >
-          <Truck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-          <span className="truncate">Van Mileage</span>
+          <Calculator className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-zinc-600 dark:text-zinc-400 shrink-0" />
+          <span className="truncate">Self Assessment</span>
         </button>
-      </div>
-
-      {/* Van Mileage Summary Panel */}
-      <div className="bg-white dark:bg-zinc-900 rounded-2xl sm:rounded-3xl border border-amber-200/70 dark:border-amber-800/50 shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-amber-100 dark:border-amber-900/40 bg-amber-50/50 dark:bg-amber-950/20">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center text-amber-600 dark:text-amber-400">
-              <Truck className="w-4 h-4" />
-            </div>
-            <div>
-              <p className="text-xs font-black text-zinc-900 dark:text-white">Van Mileage Log</p>
-              <p className="text-[10px] text-zinc-500">
-                {currentYearMileage.length} trips · Tax Year {currentYear}/{(currentYear + 1).toString().slice(2)}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="text-right">
-              <p className="text-[10px] text-zinc-400 font-semibold uppercase tracking-wider">HMRC Claim</p>
-              <p className="text-sm font-black text-amber-700 dark:text-amber-300">£{totalMileageClaim.toFixed(2)}</p>
-              <p className="text-[10px] text-zinc-500">{totalMiles.toFixed(1)} miles @ {(HMRC_STANDARD_MILEAGE_RATE * 100).toFixed(0)}p</p>
-            </div>
-            <button
-              onClick={() => setIsMileageLogOpen(true)}
-              className="flex items-center gap-1 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-[11px] font-bold shadow-sm transition-all active:scale-95"
-            >
-              <Info className="w-3 h-3" />
-              <span>Full Log</span>
-            </button>
-          </div>
-        </div>
-
-        {recentMileageEntries.length === 0 ? (
-          <div className="py-5 px-4 text-center">
-            <p className="text-xs text-zinc-500">No mileage logged yet this tax year.</p>
-            <button
-              onClick={() => setIsMileageLogOpen(true)}
-              className="mt-2 text-xs font-bold text-amber-600 hover:text-amber-700 underline"
-            >
-              Log your first trip
-            </button>
-          </div>
-        ) : (
-          <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
-            {recentMileageEntries.map(entry => {
-              const [y, m, d] = (entry.date || '').split('-');
-              const ukDate = y && m && d ? `${d}/${m}/${y}` : entry.date;
-              return (
-                <div key={entry.id} className="flex items-center justify-between px-4 py-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 truncate">
-                      {entry.destination || entry.purpose || 'Trip'}
-                    </p>
-                    <p className="text-[10px] text-zinc-400 truncate">
-                      {ukDate} · {entry.startLocation ? `${entry.startLocation} → ` : ''}{entry.destination}
-                    </p>
-                  </div>
-                  <div className="text-right shrink-0 pl-3">
-                    <p className="text-xs font-black text-zinc-900 dark:text-white">{Number(entry.miles).toFixed(1)} mi</p>
-                    <p className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">£{Number(entry.totalClaim).toFixed(2)}</p>
-                  </div>
-                </div>
-              );
-            })}
-            {currentYearMileage.length > 5 && (
-              <div className="px-4 py-2 text-center">
-                <button
-                  onClick={() => setIsMileageLogOpen(true)}
-                  className="text-[11px] font-bold text-amber-600 hover:text-amber-700 dark:text-amber-400"
-                >
-                  View all {currentYearMileage.length} trips in full log →
-                </button>
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Search & Filter Toolbar */}
@@ -763,6 +715,189 @@ export default function ExpensesView() {
           </div>
         </div>
       </div>
+      </>
+      ) : (
+        /* Van Mileage Tab Content */
+        <div className="space-y-6">
+          {/* Top Mileage Metric Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+            {/* Total Miles */}
+            <div className="p-3 sm:p-4 bg-white dark:bg-zinc-900 rounded-2xl sm:rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm flex items-center justify-between">
+              <div className="min-w-0">
+                <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-amber-600 dark:text-amber-400 block truncate">
+                  Business Miles
+                </span>
+                <div className="text-base sm:text-xl font-bold text-zinc-900 dark:text-white mt-0.5 truncate">
+                  {totalMiles.toFixed(1)} mi
+                </div>
+                <p className="text-[10px] sm:text-[11px] text-zinc-500 mt-0.5 truncate">
+                  Tax Year {currentYear}/{(currentYear + 1).toString().slice(2)}
+                </p>
+              </div>
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-amber-50 dark:bg-amber-950/50 flex-shrink-0 flex items-center justify-center text-amber-600 dark:text-amber-400">
+                <Truck className="w-4 h-4 sm:w-5 sm:h-5" />
+              </div>
+            </div>
+
+            {/* Total Tax Deduction Claim */}
+            <div className="p-3 sm:p-4 bg-white dark:bg-zinc-900 rounded-2xl sm:rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm flex items-center justify-between">
+              <div className="min-w-0">
+                <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 block truncate">
+                  HMRC Tax Relief
+                </span>
+                <div className="text-base sm:text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-0.5 truncate">
+                  £{totalMileageClaim.toFixed(2)}
+                </div>
+                <p className="text-[10px] sm:text-[11px] text-zinc-500 mt-0.5 truncate">
+                  Allowable deduction
+                </p>
+              </div>
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 flex-shrink-0 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                <TrendingDown className="w-4 h-4 sm:w-5 sm:h-5" />
+              </div>
+            </div>
+
+            {/* Total Journeys */}
+            <div className="p-3 sm:p-4 bg-white dark:bg-zinc-900 rounded-2xl sm:rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm flex items-center justify-between">
+              <div className="min-w-0">
+                <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-zinc-500 block truncate">
+                  Journeys Logged
+                </span>
+                <div className="text-base sm:text-xl font-bold text-zinc-900 dark:text-white mt-0.5 truncate">
+                  {currentYearMileage.length} trips
+                </div>
+                <p className="text-[10px] sm:text-[11px] text-zinc-500 mt-0.5 truncate">
+                  Recorded in log
+                </p>
+              </div>
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-zinc-100 dark:bg-zinc-800 flex-shrink-0 flex items-center justify-center text-zinc-600 dark:text-zinc-300">
+                <Calendar className="w-4 h-4 sm:w-5 sm:h-5" />
+              </div>
+            </div>
+
+            {/* Standard HMRC Rate */}
+            <div className="p-3 sm:p-4 bg-white dark:bg-zinc-900 rounded-2xl sm:rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm flex items-center justify-between">
+              <div className="min-w-0">
+                <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-zinc-500 block truncate">
+                  Approved Rate
+                </span>
+                <div className="text-base sm:text-xl font-bold text-zinc-900 dark:text-white mt-0.5 truncate">
+                  {(HMRC_STANDARD_MILEAGE_RATE * 100).toFixed(0)}p / mile
+                </div>
+                <p className="text-[10px] sm:text-[11px] text-zinc-500 mt-0.5 truncate">
+                  First 10k miles (vans/cars)
+                </p>
+              </div>
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-zinc-100 dark:bg-zinc-800 flex-shrink-0 flex items-center justify-center text-zinc-600 dark:text-zinc-300">
+                <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5" />
+              </div>
+            </div>
+          </div>
+
+          {/* Action Row */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <button
+              onClick={() => setIsMileageLogOpen(true)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl sm:rounded-2xl text-xs font-bold shadow-sm transition-all active:scale-95"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Log New Journey</span>
+            </button>
+
+            <button
+              onClick={() => {
+                if (currentYearMileage.length === 0) {
+                  showToast('No mileage entries to export.', 'warning');
+                  return;
+                }
+                generateMileageCsv(currentYearMileage);
+                showToast(`Exported ${currentYearMileage.length} mileage records`, 'success');
+              }}
+              className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700/80 rounded-xl sm:rounded-2xl text-xs font-bold shadow-sm transition-all active:scale-95"
+            >
+              <Download className="w-4 h-4" />
+              <span>Export HMRC Mileage CSV</span>
+            </button>
+          </div>
+
+          {/* Van Mileage Trips Table / List */}
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
+            <div className="px-5 py-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-zinc-900 dark:text-white">Tax Year Mileage Records</h3>
+                <p className="text-xs text-zinc-500">All business journeys logged for {currentYear}/{(currentYear + 1).toString().slice(2)}</p>
+              </div>
+              <button
+                onClick={() => setIsMileageLogOpen(true)}
+                className="text-xs font-bold text-amber-600 hover:text-amber-700 dark:text-amber-400 flex items-center gap-1"
+              >
+                <span>Full Log & Vehicles</span>
+                <span>→</span>
+              </button>
+            </div>
+
+            {currentYearMileage.length === 0 ? (
+              <div className="py-12 px-4 text-center">
+                <div className="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/40 flex items-center justify-center mx-auto mb-3 text-amber-600 dark:text-amber-400">
+                  <Truck className="w-6 h-6" />
+                </div>
+                <h4 className="text-sm font-bold text-zinc-900 dark:text-white">No mileage recorded yet</h4>
+                <p className="text-xs text-zinc-500 max-w-sm mx-auto mt-1 mb-4">
+                  Log trade journeys to claim 45p per mile in tax relief against your self-assessment.
+                </p>
+                <button
+                  onClick={() => setIsMileageLogOpen(true)}
+                  className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all"
+                >
+                  Log Your First Journey
+                </button>
+              </div>
+            ) : (
+              <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                {currentYearMileage.map((entry) => {
+                  const [y, m, d] = (entry.date || '').split('-');
+                  const ukDate = y && m && d ? `${d}/${m}/${y}` : entry.date;
+                  return (
+                    <div key={entry.id} className="p-4 hover:bg-zinc-50/60 dark:hover:bg-zinc-800/40 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-zinc-900 dark:text-white">
+                            {entry.destination || entry.purpose || 'Journey'}
+                          </span>
+                          {entry.vehicleName && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/40">
+                              {entry.vehicleName}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-zinc-500 mt-1">
+                          <span className="font-semibold text-zinc-700 dark:text-zinc-300">{ukDate}</span>
+                          {entry.startLocation ? ` · ${entry.startLocation} → ${entry.destination}` : ''}
+                        </p>
+                        {entry.notes && (
+                          <p className="text-[11px] text-zinc-400 italic mt-0.5">{entry.notes}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 pt-2 sm:pt-0 border-t sm:border-0 border-zinc-100 dark:border-zinc-800">
+                        <div className="text-left sm:text-right">
+                          <p className="text-sm font-black text-zinc-900 dark:text-white">{Number(entry.miles).toFixed(1)} miles</p>
+                          <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">£{Number(entry.totalClaim).toFixed(2)} relief</p>
+                        </div>
+                        <button
+                          onClick={() => setIsMileageLogOpen(true)}
+                          className="px-2.5 py-1.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg text-xs font-semibold text-zinc-700 dark:text-zinc-300 transition-all"
+                        >
+                          Edit
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Modals */}
       <ReceiptScannerModal
