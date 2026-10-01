@@ -73,7 +73,7 @@ export default function NavigationDrawer({
 
   const workflowItems = [
     { id: 'quotes' as View, label: 'Quotes & Invoices', icon: FileText },
-    { id: 'expenses' as View, label: 'Expenses', icon: ReceiptPoundSterling },
+    { id: 'expenses' as View, label: 'Expenses & Mileage', icon: ReceiptPoundSterling },
     { id: 'tasks' as View, label: 'Tasks', icon: CheckSquare },
     { id: 'supplies' as View, label: 'Supplies (The Shed)', icon: Package },
     { id: 'email' as View, label: 'Email', icon: Mail },
@@ -142,15 +142,19 @@ export default function NavigationDrawer({
                 <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
                 <span>Plan:</span>
               </div>
-              <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                subscriptionTier === 'premium'
-                  ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
-                  : isTrial
-                  ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
-                  : 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300'
-              }`}>
-                {subscriptionTier === 'premium' ? 'Premium' : isTrial ? `Trial (${trialDaysRemaining ?? 0}d left)` : 'Free Tier'}
-              </span>
+              <button
+                onClick={() => handleSelect('settings')}
+                className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full cursor-pointer hover:opacity-85 active:scale-95 transition-all ${
+                  isTrial
+                    ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
+                    : subscriptionTier === 'premium'
+                    ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
+                    : 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300'
+                }`}
+                title="Manage subscription in Settings"
+              >
+                {isTrial ? `Trial (${trialDaysRemaining ?? 0}d left)` : subscriptionTier === 'premium' ? 'Premium' : 'Free Tier'}
+              </button>
             </div>
 
             {/* Nav Item Groups */}

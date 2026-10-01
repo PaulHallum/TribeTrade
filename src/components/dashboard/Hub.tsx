@@ -43,6 +43,7 @@ import { logger } from '../../services/logger';
 import AppSpecificPasswordModal from '../settings/AppSpecificPasswordModal';
 import SmartCaptureModal from '../smart/SmartCaptureModal';
 import CalendarEventModal from '../calendar/CalendarEventModal';
+import VehicleComplianceModal from '../calendar/VehicleComplianceModal';
 import TaskModal from '../tasks/TaskModal';
 import NoteModal from '../tasks/NoteModal';
 import QuotePreviewModal from '../quotes/QuotePreviewModal';
@@ -80,6 +81,7 @@ export default function Hub({ onNavigate, onGenerateBriefing }: { onNavigate?: (
   const [loadingEmails, setLoadingEmails] = useState(false);
   const [selectedEmail, setSelectedEmail] = useState<EmailMessage | null>(null);
   const [selectedEventForModal, setSelectedEventForModal] = useState<any | null>(null);
+  const [selectedVehicleEvent, setSelectedVehicleEvent] = useState<any | null>(null);
   const [selectedTaskForModal, setSelectedTaskForModal] = useState<any | null>(null);
   const [selectedNoteForModal, setSelectedNoteForModal] = useState<any | null>(null);
   const [selectedQuoteForPreview, setSelectedQuoteForPreview] = useState<Quote | null>(null);
@@ -508,13 +510,17 @@ export default function Hub({ onNavigate, onGenerateBriefing }: { onNavigate?: (
                 categories={categories}
                 onClick={() => {
                   if (item.type === 'event' || item.type === 'birthday') {
-                    setSelectedEventForModal({
-                      ...item.data,
-                      id: item.id,
-                      title: item.title,
-                      startTime: item.date?.toISOString() || new Date().toISOString(),
-                      type: item.data?.type || (item.type === 'birthday' ? 'birthday' : 'event')
-                    });
+                    if (item.data?.type === 'vehicle' || item.data?.source === 'vehicle_compliance' || item.data?.vehicleId) {
+                      setSelectedVehicleEvent(item.data || item);
+                    } else {
+                      setSelectedEventForModal({
+                        ...item.data,
+                        id: item.id,
+                        title: item.title,
+                        startTime: item.date?.toISOString() || new Date().toISOString(),
+                        type: item.data?.type || (item.type === 'birthday' ? 'birthday' : 'event')
+                      });
+                    }
                   } else {
                     onNavigate?.(item.type === 'task' ? 'tasks' : 'calendar');
                   }
@@ -928,6 +934,15 @@ export default function Hub({ onNavigate, onGenerateBriefing }: { onNavigate?: (
             tradeUserId={tradeUserId!}
             members={members}
             onClose={() => setSelectedEventForModal(null)}
+          />
+        )}
+        {selectedVehicleEvent && (
+          <VehicleComplianceModal
+            event={selectedVehicleEvent}
+            tradeUserId={tradeUserId!}
+            userId={user?.uid}
+            onClose={() => setSelectedVehicleEvent(null)}
+            onNavigateToSettings={() => onNavigate?.('settings')}
           />
         )}
       </AnimatePresence>

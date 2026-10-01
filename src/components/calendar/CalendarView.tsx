@@ -185,6 +185,17 @@ export default function CalendarView({ initialEventId, onInitialItemHandled }: {
   }, [selectedDate]);
 
   useEffect(() => {
+    const handleEventDeleted = (e: any) => {
+      const deletedId = e.detail?.id;
+      if (deletedId) {
+        setGoogleEvents(prev => prev.filter(item => item.id !== deletedId));
+      }
+    };
+    window.addEventListener('tribe_calendar_event_deleted', handleEventDeleted);
+    return () => window.removeEventListener('tribe_calendar_event_deleted', handleEventDeleted);
+  }, []);
+
+  useEffect(() => {
     const effectiveTradeUserId = tradeUserId || (user ? `trade_${user.uid}` : '');
     if (!effectiveTradeUserId) return;
 
@@ -290,7 +301,9 @@ export default function CalendarView({ initialEventId, onInitialItemHandled }: {
                   return hex;
                 };
 
-                return (data.items || []).map((e: any) => ({
+                return (data.items || [])
+                  .filter((e: any) => e.status !== 'cancelled')
+                  .map((e: any) => ({
                   id: `google|${cal.id}|${e.id}`,
                   title: e.summary || '(No title)',
                   startTime: e.start?.dateTime || e.start?.date || '',
@@ -469,13 +482,15 @@ export default function CalendarView({ initialEventId, onInitialItemHandled }: {
               >
                 <Share2 size={18} />
               </button>
-              <button
-                onClick={() => window.open('https://calendar.google.com', '_blank')}
-                className="p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors text-slate-600 dark:text-slate-400"
-                title="Open Google Calendar"
-              >
-                <ExternalLink size={18} />
-              </button>
+              {googleAccessToken && (
+                <button
+                  onClick={() => window.open('https://calendar.google.com', '_blank')}
+                  className="p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors text-slate-600 dark:text-slate-400"
+                  title="Open Google Calendar"
+                >
+                  <ExternalLink size={18} />
+                </button>
+              )}
               <button
                 onClick={() => setCurrentDate(subMonths(currentDate, 1))}
                 className="p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors"

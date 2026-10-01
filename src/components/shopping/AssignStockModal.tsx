@@ -36,19 +36,21 @@ export default function AssignStockModal({
 
   const [quantity, setQuantity] = useState<number>(1);
   const [unitPrice, setUnitPrice] = useState<number | string>(0);
-  const [targetType, setTargetType] = useState<'invoice' | 'custom'>('invoice');
+  const [targetType, setTargetType] = useState<'invoice' | 'quote' | 'custom'>('invoice');
   const [targetId, setTargetId] = useState<string>('');
   const [customJobTitle, setCustomJobTitle] = useState<string>('');
   const [customCustomerName, setCustomCustomerName] = useState<string>('');
+  const [jobDate, setJobDate] = useState<string>(new Date().toISOString().split('T')[0]);
 
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loadingJobs, setLoadingJobs] = useState<boolean>(true);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   const availableStock = Math.max(0, (Number(item?.quantity) || 0) - (Number(item?.reservedQuantity) || 0));
 
-  // Reset and fetch invoices on open
+  // Reset and fetch invoices and quotes on open
   useEffect(() => {
     if (!isOpen || !tradeUserId || !item) return;
 
@@ -56,6 +58,7 @@ export default function AssignStockModal({
     setUnitPrice(item.costPrice || 0);
     setError(null);
     setLoadingJobs(true);
+    setJobDate(new Date().toISOString().split('T')[0]);
 
     const fetchJobs = async () => {
       try {
@@ -64,9 +67,21 @@ export default function AssignStockModal({
         const iList = iSnap.docs.map(d => ({ id: d.id, ...d.data() } as Invoice));
         setInvoices(iList);
 
+        const quoteRef = collection(db, 'trade_users', tradeUserId, 'quotes');
+        const qSnap = await getDocs(query(quoteRef, orderBy('createdAt', 'desc'), limit(50)));
+        const qList = qSnap.docs
+          .map(d => ({ id: d.id, ...d.data() } as Quote))
+          .filter(q => q.status !== 'declined');
+        setQuotes(qList);
+
         if (iList.length > 0) {
           setTargetType('invoice');
           setTargetId(iList[0].id);
+          if (iList[0].dateIssued) setJobDate(iList[0].dateIssued);
+        } else if (qList.length > 0) {
+          setTargetType('quote');
+          setTargetId(qList[0].id);
+          if (qList[0].dateIssued) setJobDate(qList[0].dateIssued);
         } else {
           setTargetType('custom');
           setTargetId('');
@@ -105,6 +120,15 @@ export default function AssignStockModal({
       }
       jobTitle = `${inv.invoiceNumber}: ${inv.jobTitle || 'Invoiced Works'}`;
       customerName = inv.customerName;
+    } else if (targetType === 'quote') {
+      const selectedId = targetId || quotes[0]?.id;
+      const q = quotes.find(quote => quote.id === selectedId);
+      if (!q) {
+        setError('Please select a Quote for this assignment.');
+        return;
+      }
+      jobTitle = `${q.quoteNumber}: ${q.jobTitle || 'Quoted Works'}`;
+      customerName = q.customerName;
     } else {
       if (!customJobTitle.trim()) {
         setError('Please enter a job title or client site reference.');
@@ -128,7 +152,8 @@ export default function AssignStockModal({
         targetType,
         targetId: targetType !== 'custom' ? targetId : undefined,
         jobTitle,
-        customerName
+        customerName,
+        jobDate
       });
 
       showToast(`Assigned ${assignQty}x ${item.name} to "${jobTitle}"`, 'success');
@@ -258,35 +283,54 @@ export default function AssignStockModal({
             <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
               Assign To:
             </label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
                 onClick={() => {
                   setTargetType('invoice');
-                  if (!targetId && invoices.length > 0) {
+                  if (invoices.length > 0) {
                     setTargetId(invoices[0].id);
+                    if (invoices[0].dateIssued) setJobDate(invoices[0].dateIssued);
                   }
                 }}
-                className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                   targetType === 'invoice'
                     ? 'bg-blue-600 text-white shadow-sm'
                     : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200'
                 }`}
               >
-                <Receipt className="w-3.5 h-3.5" />
-                <span>Trade Invoice</span>
+                <Receipt className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">Invoice</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setTargetType('quote');
+                  if (quotes.length > 0) {
+                    setTargetId(quotes[0].id);
+                    if (quotes[0].dateIssued) setJobDate(quotes[0].dateIssued);
+                  }
+                }}
+                className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                  targetType === 'quote'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200'
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">Quote</span>
               </button>
               <button
                 type="button"
                 onClick={() => setTargetType('custom')}
-                className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                   targetType === 'custom'
                     ? 'bg-blue-600 text-white shadow-sm'
                     : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200'
                 }`}
               >
-                <PlusCircle className="w-3.5 h-3.5" />
-                <span>Custom / Direct Job</span>
+                <PlusCircle className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">Direct Job</span>
               </button>
             </div>
           </div>
@@ -303,17 +347,57 @@ export default function AssignStockModal({
                 </div>
               ) : invoices.length === 0 ? (
                 <p className="text-xs text-zinc-400 italic py-2">
-                  No invoices found. Select "Custom Job" to enter job details.
+                  No invoices found. Select "Quote" or "Direct Job" instead.
                 </p>
               ) : (
                 <select
                   value={targetId || invoices[0]?.id || ''}
-                  onChange={(e) => setTargetId(e.target.value)}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    setTargetId(id);
+                    const inv = invoices.find(i => i.id === id);
+                    if (inv?.dateIssued) setJobDate(inv.dateIssued);
+                  }}
                   className="w-full px-3.5 py-2.5 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-bold text-zinc-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   {invoices.map(inv => (
                     <option key={inv.id} value={inv.id}>
                       {inv.invoiceNumber}: {inv.jobTitle || 'Works'} — {inv.customerName} (£{inv.grandTotal.toFixed(2)})
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
+
+          {targetType === 'quote' && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
+                Select Quote
+              </label>
+              {loadingJobs ? (
+                <div className="flex items-center gap-2 py-3 text-xs text-zinc-400">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Loading quotes...</span>
+                </div>
+              ) : quotes.length === 0 ? (
+                <p className="text-xs text-zinc-400 italic py-2">
+                  No active quotes found. Select "Direct Job" instead.
+                </p>
+              ) : (
+                <select
+                  value={targetId || quotes[0]?.id || ''}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    setTargetId(id);
+                    const q = quotes.find(item => item.id === id);
+                    if (q?.dateIssued) setJobDate(q.dateIssued);
+                  }}
+                  className="w-full px-3.5 py-2.5 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-bold text-zinc-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {quotes.map(q => (
+                    <option key={q.id} value={q.id}>
+                      {q.quoteNumber}: {q.jobTitle || 'Works'} — {q.customerName} (£{q.grandTotal.toFixed(2)})
                     </option>
                   ))}
                 </select>
@@ -350,6 +434,19 @@ export default function AssignStockModal({
               </div>
             </div>
           )}
+
+          {/* Job Date */}
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
+              Job Date / Scheduled Date
+            </label>
+            <input
+              type="date"
+              value={jobDate}
+              onChange={(e) => setJobDate(e.target.value)}
+              className="w-full px-3.5 py-2.5 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-medium text-zinc-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
+            />
+          </div>
 
           {/* Unit Price to Charge */}
           <div className="space-y-1.5 pt-1">

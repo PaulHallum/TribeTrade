@@ -4,11 +4,13 @@ import {
   doc,
   getDocs,
   getDoc,
+  setDoc,
   addDoc,
   updateDoc,
   deleteDoc,
   onSnapshot,
   query,
+  where,
   orderBy,
   limit,
   serverTimestamp
@@ -36,13 +38,16 @@ export interface ShedAllocationRecord {
   stockItemName: string;
   quantity: number;
   unit?: string;
-  targetType: 'invoice' | 'custom';
+  targetType: 'invoice' | 'quote' | 'custom';
   targetId?: string | null;
   jobTitle: string;
   customerName?: string;
   unitPrice: number;
   totalCharged: number;
   allocatedAt: string;
+  jobDate?: string;
+  status?: 'active' | 'completed' | 'unreserved';
+  completedAt?: string;
 }
 
 export interface AssignStockParams {
@@ -52,10 +57,11 @@ export interface AssignStockParams {
   quantityToAssign: number;
   unit?: string;
   unitPrice?: number;
-  targetType: 'invoice' | 'custom';
+  targetType: 'invoice' | 'quote' | 'custom';
   targetId?: string;
   jobTitle: string;
   customerName?: string;
+  jobDate?: string;
 }
 
 /**
@@ -227,8 +233,58 @@ export async function assignStockToJob(params: AssignStockParams): Promise<void>
     }
   }
 
+  // 3. If assigning to an existing Quote, append material line item and recalculate totals
+  if (targetType === 'quote' && targetId) {
+    const quoteRef = doc(db, 'trade_users', tradeUserId, 'quotes', targetId);
+    const quoteSnap = await getDoc(quoteRef);
+    if (quoteSnap.exists()) {
+      const quoteData = quoteSnap.data() as Quote;
+      const currentItems: QuoteItem[] = quoteData.items || [];
+      const itemTotal = Number((quantityToAssign * unitPrice).toFixed(2));
+
+      const newItem: QuoteItem = {
+        id: `shed_${Date.now()}`,
+        description: `${stockItemName} (allocated from The Shed)`,
+        type: 'material',
+        quantity: quantityToAssign,
+        unit: unit,
+        unitPrice: unitPrice,
+        total: itemTotal
+      };
+
+      const updatedItems = [...currentItems, newItem];
+      const subtotalLabour = updatedItems
+        .filter(i => i.type === 'labour')
+        .reduce((sum, i) => sum + (Number(i.total) || 0), 0);
+      const subtotalMaterials = updatedItems
+        .filter(i => i.type === 'material')
+        .reduce((sum, i) => sum + (Number(i.total) || 0), 0);
+      const otherTotal = updatedItems
+        .filter(i => i.type !== 'labour' && i.type !== 'material')
+        .reduce((sum, i) => sum + (Number(i.total) || 0), 0);
+
+      const netTotal = Number((subtotalLabour + subtotalMaterials + otherTotal).toFixed(2));
+      const vatRate = quoteData.vatRate || 20;
+      const vatAmount = quoteData.isVatRegistered
+        ? Number(((netTotal * vatRate) / 100).toFixed(2))
+        : 0;
+      const grandTotal = Number((netTotal + vatAmount).toFixed(2));
+
+      await updateDoc(quoteRef, {
+        items: updatedItems,
+        subtotalLabour,
+        subtotalMaterials,
+        netTotal,
+        vatAmount,
+        grandTotal,
+        updatedAt: new Date().toISOString()
+      });
+    }
+  }
+
   // 4. Log allocation audit record in shedAllocations
   const allocRef = collection(db, 'trade_users', tradeUserId, 'shedAllocations');
+  const jobDate = params.jobDate || new Date().toISOString().split('T')[0];
   await addDoc(allocRef, {
     stockItemId,
     stockItemName,
@@ -240,7 +296,9 @@ export async function assignStockToJob(params: AssignStockParams): Promise<void>
     customerName,
     unitPrice,
     totalCharged: Number((quantityToAssign * unitPrice).toFixed(2)),
-    allocatedAt: new Date().toISOString()
+    allocatedAt: new Date().toISOString(),
+    jobDate,
+    status: 'active'
   });
 }
 
@@ -329,6 +387,232 @@ export async function releaseShedStock(
       reservedQuantity: newReserved,
       updatedAt: serverTimestamp()
     });
+  }
+}
+
+/**
+ * Unreserves stock allocated to a job, returning the quantity to The Shed
+ * and removing or updating the line item from the linked invoice/quote.
+ */
+export async function unreserveStockAllocation(
+  tradeUserId: string,
+  allocationId: string
+): Promise<void> {
+  if (!tradeUserId || !allocationId) return;
+
+  const allocDocRef = doc(db, 'trade_users', tradeUserId, 'shedAllocations', allocationId);
+  const allocSnap = await getDoc(allocDocRef);
+  if (!allocSnap.exists()) return;
+
+  const allocData = allocSnap.data() as ShedAllocationRecord;
+  const { stockItemId, stockItemName, quantity, targetType, targetId } = allocData;
+
+  // 1. Restore stock in The Shed
+  if (stockItemId && quantity > 0) {
+    const stockDocRef = doc(db, 'trade_users', tradeUserId, 'shedInventory', stockItemId);
+    const stockSnap = await getDoc(stockDocRef);
+    if (stockSnap.exists()) {
+      const currentQty = Number(stockSnap.data()?.quantity || 0);
+      const newQty = Number((currentQty + quantity).toFixed(2));
+      await updateDoc(stockDocRef, {
+        quantity: newQty,
+        updatedAt: serverTimestamp()
+      });
+    } else {
+      // Recreate item in The Shed if it was deleted when reaching 0
+      await setDoc(stockDocRef, {
+        id: stockItemId,
+        name: stockItemName,
+        quantity: quantity,
+        unit: allocData.unit || 'units',
+        costPrice: allocData.unitPrice || 0,
+        category: detectCategory(stockItemName),
+        reservedQuantity: 0,
+        isKeyItem: false,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+    }
+  }
+
+  // 2. Remove line item from linked invoice if target is invoice
+  if (targetType === 'invoice' && targetId) {
+    try {
+      const invRef = doc(db, 'trade_users', tradeUserId, 'invoices', targetId);
+      const invSnap = await getDoc(invRef);
+      if (invSnap.exists()) {
+        const invData = invSnap.data() as Invoice;
+        const currentItems: QuoteItem[] = invData.items || [];
+        let removed = false;
+        const updatedItems = currentItems.filter(item => {
+          if (!removed && (item.description.includes(stockItemName) || item.id.startsWith('shed_'))) {
+            removed = true;
+            return false;
+          }
+          return true;
+        });
+
+        const subtotalLabour = updatedItems
+          .filter(i => i.type === 'labour')
+          .reduce((sum, i) => sum + (Number(i.total) || 0), 0);
+        const subtotalMaterials = updatedItems
+          .filter(i => i.type === 'material')
+          .reduce((sum, i) => sum + (Number(i.total) || 0), 0);
+        const otherTotal = updatedItems
+          .filter(i => i.type !== 'labour' && i.type !== 'material')
+          .reduce((sum, i) => sum + (Number(i.total) || 0), 0);
+
+        const netTotal = Number((subtotalLabour + subtotalMaterials + otherTotal).toFixed(2));
+        const vatRate = invData.vatRate || 20;
+        const vatAmount = invData.isVatRegistered
+          ? Number(((netTotal * vatRate) / 100).toFixed(2))
+          : 0;
+        const grandTotal = Number((netTotal + vatAmount).toFixed(2));
+
+        await updateDoc(invRef, {
+          items: updatedItems,
+          subtotalLabour,
+          subtotalMaterials,
+          netTotal,
+          vatAmount,
+          grandTotal,
+          updatedAt: new Date().toISOString()
+        });
+      }
+    } catch (err) {
+      console.warn('Failed to update invoice items during unreserve:', err);
+    }
+  }
+
+  // 3. Remove line item from linked quote if target is quote
+  if (targetType === 'quote' && targetId) {
+    try {
+      const quoteRef = doc(db, 'trade_users', tradeUserId, 'quotes', targetId);
+      const quoteSnap = await getDoc(quoteRef);
+      if (quoteSnap.exists()) {
+        const quoteData = quoteSnap.data() as Quote;
+        const currentItems: QuoteItem[] = quoteData.items || [];
+        let removed = false;
+        const updatedItems = currentItems.filter(item => {
+          if (!removed && (item.description.includes(stockItemName) || item.id.startsWith('shed_'))) {
+            removed = true;
+            return false;
+          }
+          return true;
+        });
+
+        const subtotalLabour = updatedItems
+          .filter(i => i.type === 'labour')
+          .reduce((sum, i) => sum + (Number(i.total) || 0), 0);
+        const subtotalMaterials = updatedItems
+          .filter(i => i.type === 'material')
+          .reduce((sum, i) => sum + (Number(i.total) || 0), 0);
+        const otherTotal = updatedItems
+          .filter(i => i.type !== 'labour' && i.type !== 'material')
+          .reduce((sum, i) => sum + (Number(i.total) || 0), 0);
+
+        const netTotal = Number((subtotalLabour + subtotalMaterials + otherTotal).toFixed(2));
+        const vatRate = quoteData.vatRate || 20;
+        const vatAmount = quoteData.isVatRegistered
+          ? Number(((netTotal * vatRate) / 100).toFixed(2))
+          : 0;
+        const grandTotal = Number((netTotal + vatAmount).toFixed(2));
+
+        await updateDoc(quoteRef, {
+          items: updatedItems,
+          subtotalLabour,
+          subtotalMaterials,
+          netTotal,
+          vatAmount,
+          grandTotal,
+          updatedAt: new Date().toISOString()
+        });
+      }
+    } catch (err) {
+      console.warn('Failed to update quote items during unreserve:', err);
+    }
+  }
+
+  // 4. Delete the allocation document
+  await deleteDoc(allocDocRef);
+}
+
+/**
+ * Unreserves all allocations for a given job.
+ */
+export async function unreserveJobAllocations(
+  tradeUserId: string,
+  allocations: ShedAllocationRecord[]
+): Promise<void> {
+  if (!tradeUserId || !allocations || allocations.length === 0) return;
+  for (const alloc of allocations) {
+    if (alloc.id) {
+      await unreserveStockAllocation(tradeUserId, alloc.id);
+    }
+  }
+}
+
+/**
+ * Marks an allocation record as completed when a job has passed or finishes.
+ */
+export async function markAllocationCompleted(
+  tradeUserId: string,
+  allocationId: string
+): Promise<void> {
+  if (!tradeUserId || !allocationId) return;
+  const allocDocRef = doc(db, 'trade_users', tradeUserId, 'shedAllocations', allocationId);
+  await updateDoc(allocDocRef, {
+    status: 'completed',
+    completedAt: new Date().toISOString()
+  });
+}
+
+/**
+ * Removes all stock allocations associated with an invoice or quote.
+ * Used when an invoice or quote is deleted, returning reserved stock back to The Shed.
+ */
+export async function removeAllocationsForTarget(
+  tradeUserId: string,
+  targetId: string,
+  restoreStock: boolean = true
+): Promise<void> {
+  if (!tradeUserId || !targetId) return;
+
+  try {
+    const allocRef = collection(db, 'trade_users', tradeUserId, 'shedAllocations');
+    const q = query(allocRef, where('targetId', '==', targetId));
+    const snap = await getDocs(q);
+
+    for (const allocDoc of snap.docs) {
+      const data = allocDoc.data() as ShedAllocationRecord;
+      if (restoreStock && data.stockItemId && data.quantity > 0) {
+        const stockDocRef = doc(db, 'trade_users', tradeUserId, 'shedInventory', data.stockItemId);
+        const stockSnap = await getDoc(stockDocRef);
+        if (stockSnap.exists()) {
+          const currentQty = Number(stockSnap.data()?.quantity || 0);
+          await updateDoc(stockDocRef, {
+            quantity: Number((currentQty + data.quantity).toFixed(2)),
+            updatedAt: serverTimestamp()
+          });
+        } else {
+          await setDoc(stockDocRef, {
+            id: data.stockItemId,
+            name: data.stockItemName,
+            quantity: data.quantity,
+            unit: data.unit || 'units',
+            costPrice: data.unitPrice || 0,
+            category: detectCategory(data.stockItemName),
+            reservedQuantity: 0,
+            isKeyItem: false,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          });
+        }
+      }
+      await deleteDoc(allocDoc.ref);
+    }
+  } catch (err) {
+    console.error('Failed to cleanup allocations for target:', targetId, err);
   }
 }
 

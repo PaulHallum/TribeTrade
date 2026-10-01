@@ -19,6 +19,7 @@ import { useSubscriptionTier } from '../../hooks/useSubscriptionTier';
 import { syncToGoogleCalendar } from '../../services/googleCalendar';
 import CameraChoiceModal from '../common/CameraChoiceModal';
 import { combineDateTimeToISO, combineDateTimeToDate } from '../../lib/dateUtils';
+import { calculateReminderTime } from '../../lib/reminderUtils';
 import { detectCategory, normalizeIngredient, splitBulkItems } from '../../lib/shoppingUtils';
 
 
@@ -328,6 +329,10 @@ export default function AIInput() {
 
           const dueDate = new Date(data.dueDate);
           const isDueDateValid = !isNaN(dueDate.getTime());
+          const offset = settings?.defaultReminderOffset || 'at_time';
+          const calcReminder = isDueDateValid ? calculateReminderTime(dueDate, offset) : null;
+          const now = new Date();
+          const shouldReset = calcReminder ? calcReminder >= new Date(now.getTime() - 15 * 60 * 1000) : false;
           
           await addDoc(collection(db, 'trade_users', tradeUserId, 'tasks'), {
             title: data.title || userText.substring(0, 50),
@@ -337,8 +342,9 @@ export default function AIInput() {
             assignedTo: data.assignedTo || null,
             isShared: true,
             dueDate: isDueDateValid ? dueDate : null,
-            reminderTime: isDueDateValid ? dueDate : null,
-            notified: false,
+            reminderTime: calcReminder,
+            reminderOffset: offset,
+            notified: !shouldReset,
             createdAt: new Date().toISOString()
           });
         } else if (action === 'CREATE_CALENDAR_EVENT') {
@@ -368,6 +374,11 @@ export default function AIInput() {
             endTime = new Date(startTime.getTime() + 3600000);
           }
 
+          const offset = settings?.defaultReminderOffset || 'at_time';
+          const calcReminder = isStartTimeValid ? calculateReminderTime(startTime, offset) : null;
+          const now = new Date();
+          const shouldReset = calcReminder ? calcReminder >= new Date(now.getTime() - 15 * 60 * 1000) : false;
+
           const eventData = {
             title: data.title || userText.substring(0, 50),
             description: data.description || '',
@@ -376,8 +387,9 @@ export default function AIInput() {
             location: data.location || '',
             authorId: user.uid,
             isShared: true,
-            reminderTime: isStartTimeValid ? startTime : null,
-            notified: false,
+            reminderTime: calcReminder,
+            reminderOffset: offset,
+            notified: !shouldReset,
             createdAt: new Date().toISOString()
           };
           const docRef = await addDoc(collection(db, 'trade_users', tradeUserId, 'calendarEvents'), eventData);

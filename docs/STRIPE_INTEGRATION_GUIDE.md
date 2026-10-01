@@ -99,8 +99,8 @@ STRIPE_SECRET_KEY="sk_live_..."
 STRIPE_WEBHOOK_SECRET="whsec_..."
 
 # Stripe Price IDs for Subscription Tiers
-STRIPE_PRICE_ID_MONTHLY="price_1U0LNyJzUUmzIl9XtVTb93C6"
-STRIPE_PRICE_ID_YEARLY="price_1U0LOZJzUUmzIl9XNhlQ3t7i"
+STRIPE_PRICE_ID_MONTHLY="price_1UKfc1FWv1lYokmYzTSwrpnx"
+STRIPE_PRICE_ID_YEARLY="price_1UKfcUFWv1lYokmYhdLpT7Sm"
 
 # Optional: Fallback Direct Payment Links
 STRIPE_PAYMENT_LINK_MONTHLY="https://buy.stripe.com/..."
@@ -256,6 +256,7 @@ app.post('/api/billing/checkout', async (req, res) => {
       line_items: [{ price: priceId, quantity: 1 }],
       customer_email: email,
       client_reference_id: uid, // Crucial for mapping payment back to user
+      allow_promotion_codes: true,
       success_url: `${process.env.APP_URL}/?view=settings&payment=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.APP_URL}/?view=settings&payment=cancelled`,
     });

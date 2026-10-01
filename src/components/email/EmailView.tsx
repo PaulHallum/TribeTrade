@@ -1,5 +1,21 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Mail, Loader2, RefreshCw, Inbox, ExternalLink, LogIn, Sparkles, X, Trash2 } from 'lucide-react';
+import { 
+  Mail, 
+  Loader2, 
+  RefreshCw, 
+  Inbox, 
+  ExternalLink, 
+  LogIn, 
+  Sparkles, 
+  X, 
+  Trash2,
+  Calendar,
+  Package,
+  ArrowRight,
+  Info,
+  ChevronRight,
+  Settings
+} from 'lucide-react';
 import { useAuth } from '../../App';
 import { useToast } from '../../contexts/ToastContext';
 import { useSettings } from '../../contexts/SettingsContext';
@@ -18,6 +34,7 @@ import YahooIcon from '../layout/YahooIcon';
 import AppleIcon from '../layout/AppleIcon';
 import AppSpecificPasswordModal from '../settings/AppSpecificPasswordModal';
 import { fetchConnectedAccountsMessages } from '../../services/emailAdapters';
+import { SAMPLE_TRADE_JOB_NOTE } from '../../data/sampleTemplates';
 
 interface EmailMessage {
   id: string;
@@ -39,8 +56,12 @@ const stripHtml = (html: string) => {
   return tmp.textContent || tmp.innerText || '';
 };
 
-export default function EmailView() {
-  const { googleAccessToken, refreshGoogleToken, tradeUserId } = useAuth();
+interface EmailViewProps {
+  onNavigate?: (view: string, tab?: string | null) => void;
+}
+
+export default function EmailView({ onNavigate }: EmailViewProps = {}) {
+  const { user, googleAccessToken, refreshGoogleToken, tradeUserId } = useAuth();
   const { showToast } = useToast();
   const { settings } = useSettings();
   const [emails, setEmails] = useState<EmailMessage[]>([]);
@@ -58,6 +79,8 @@ export default function EmailView() {
   const [hasMore, setHasMore] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [passwordModalProvider, setPasswordModalProvider] = useState<'apple' | 'google' | 'outlook' | 'yahoo' | 'sky'>('google');
+  const [connectingProvider, setConnectingProvider] = useState<string | null>(null);
+  const [sampleSmartCaptureOpen, setSampleSmartCaptureOpen] = useState(false);
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean;
     title: string;
@@ -199,6 +222,260 @@ export default function EmailView() {
     fetchEmails();
   }, [fetchEmails]);
 
+  const handleOAuthConnect = async (provider: string) => {
+    setConnectingProvider(provider);
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) {
+        showToast('Please log in again to connect your email account.', 'error');
+        setConnectingProvider(null);
+        return;
+      }
+
+      const res = await fetch(`/api/oauth/connect?provider=${encodeURIComponent(provider)}`, {
+        headers: { Authorization: `Bearer ${idToken}` }
+      });
+      const responseText = await res.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(responseText);
+      } catch (err) {
+        console.error('[OAuth] Non-JSON response received from server:', responseText);
+        showToast('Backend server connection error. Please try again shortly.', 'error');
+        setConnectingProvider(null);
+        return;
+      }
+
+      if (!res.ok || !data.authUrl) {
+        showToast(data.error || 'Failed to start connection', 'error');
+        setConnectingProvider(null);
+        return;
+      }
+
+      window.location.href = data.authUrl;
+    } catch (err: any) {
+      console.error('[OAuth Connect Error]', err);
+      showToast('Could not start connection: ' + err.message, 'error');
+      setConnectingProvider(null);
+    }
+  };
+
+  const renderMailboxConnectGuide = () => (
+    <div className="max-w-2xl mx-auto space-y-4 py-4 px-2 sm:px-0">
+      {/* 1. Explanatory Header: Why aren't emails here yet? */}
+      <div className="p-4 sm:p-5 bg-gradient-to-br from-indigo-50/80 via-blue-50/50 to-white dark:from-indigo-950/30 dark:via-zinc-900 dark:to-zinc-900 rounded-3xl border border-indigo-100 dark:border-indigo-900/40 shadow-sm space-y-3">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm mt-0.5">
+            <Mail className="w-5 h-5" />
+          </div>
+          <div className="space-y-1 min-w-0">
+            <h3 className="text-base font-bold text-zinc-900 dark:text-white">
+              How to See Client Emails & Enquiries Here
+            </h3>
+            <p className="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed">
+              <strong>Why aren't emails showing automatically?</strong> Logging in with your work email (e.g. <span className="font-semibold text-zinc-900 dark:text-zinc-100">{user?.email || 'bob@bobstrades.co.uk'}</span>) sets up your secure TribeTrade login. However, for your privacy and data security, TribeTrade cannot read into your private external email inbox until you link your mailbox.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. What you need to do: Step-by-Step Provider Connection */}
+      <div className="p-4 sm:p-5 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-4">
+        <div>
+          <h4 className="text-xs font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+            Step 1: Choose Your Mailbox Provider
+          </h4>
+          <p className="text-xs text-zinc-600 dark:text-zinc-300 mt-0.5">
+            Connect your trade email address once to enable real-time message streaming:
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          {/* Microsoft Outlook / 365 */}
+          <div className="p-3.5 bg-zinc-50 dark:bg-zinc-800/60 rounded-2xl border border-zinc-200/80 dark:border-zinc-700/60 flex flex-col justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-white dark:bg-zinc-750 flex items-center justify-center shadow-xs shrink-0">
+                <MicrosoftIcon className="w-4 h-4" isColoured={true} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-zinc-900 dark:text-white truncate">Microsoft Outlook / 365</p>
+                <p className="text-[10px] text-zinc-500 truncate">Work Exchange & Hotmail</p>
+              </div>
+            </div>
+            <button
+              onClick={() => handleOAuthConnect('microsoft')}
+              disabled={connectingProvider === 'microsoft'}
+              className="w-full py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-95 disabled:opacity-50"
+            >
+              {connectingProvider === 'microsoft' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MicrosoftIcon className="w-3.5 h-3.5" isColoured={false} />}
+              <span>Sign In with Microsoft</span>
+            </button>
+          </div>
+
+          {/* Google Workspace / Gmail */}
+          <div className="p-3.5 bg-zinc-50 dark:bg-zinc-800/60 rounded-2xl border border-zinc-200/80 dark:border-zinc-700/60 flex flex-col justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-white dark:bg-zinc-750 flex items-center justify-center shadow-xs shrink-0">
+                <GoogleIcon className="w-4 h-4" isColoured={true} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-zinc-900 dark:text-white truncate">Google / Gmail</p>
+                <p className="text-[10px] text-zinc-500 truncate">Custom Domain & Gmail</p>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                setPasswordModalProvider('google');
+                setIsPasswordModalOpen(true);
+              }}
+              className="w-full py-2 px-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-95"
+            >
+              <GoogleIcon className="w-3.5 h-3.5" isColoured={false} />
+              <span>Connect Gmail</span>
+            </button>
+          </div>
+
+          {/* Apple Mail */}
+          <div className="p-3.5 bg-zinc-50 dark:bg-zinc-800/60 rounded-2xl border border-zinc-200/80 dark:border-zinc-700/60 flex flex-col justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-white dark:bg-zinc-750 flex items-center justify-center shadow-xs shrink-0">
+                <AppleIcon className="w-4 h-4 text-zinc-900 dark:text-white" isColoured={true} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-zinc-900 dark:text-white truncate">Apple Mail (iCloud)</p>
+                <p className="text-[10px] text-zinc-500 truncate">iCloud & me.com accounts</p>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                setPasswordModalProvider('apple');
+                setIsPasswordModalOpen(true);
+              }}
+              className="w-full py-2 px-3 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-95"
+            >
+              <AppleIcon className="w-3.5 h-3.5" isColoured={false} />
+              <span>Connect Apple Mail</span>
+            </button>
+          </div>
+
+          {/* Sky Mail & Yahoo */}
+          <div className="p-3.5 bg-zinc-50 dark:bg-zinc-800/60 rounded-2xl border border-zinc-200/80 dark:border-zinc-700/60 flex flex-col justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-white dark:bg-zinc-750 flex items-center justify-center shadow-xs shrink-0">
+                <YahooIcon className="w-4 h-4" isColoured={true} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-zinc-900 dark:text-white truncate">Sky & Yahoo Mail</p>
+                <p className="text-[10px] text-zinc-500 truncate">Sky broadband & Yahoo accounts</p>
+              </div>
+            </div>
+            <button
+              onClick={() => handleOAuthConnect('yahoo')}
+              disabled={connectingProvider === 'yahoo'}
+              className="w-full py-2 px-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-95 disabled:opacity-50"
+            >
+              {connectingProvider === 'yahoo' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <YahooIcon className="w-3.5 h-3.5" isColoured={true} />}
+              <span>Sign In with Sky / Yahoo</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between pt-1">
+          {onNavigate ? (
+            <button
+              onClick={() => onNavigate('settings', 'accounts')}
+              className="text-xs font-bold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 flex items-center gap-1"
+            >
+              <span>Manage All Connected Accounts in Settings</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          ) : <div />}
+          <button
+            onClick={() => fetchEmails()}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 text-xs font-semibold rounded-xl transition-all"
+            title="Refresh Inbox"
+          >
+            <RefreshCw className="w-3 h-3" />
+            <span>Check for New Emails</span>
+          </button>
+        </div>
+      </div>
+
+      {/* 3. What benefits it will bring */}
+      <div className="p-4 sm:p-5 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-3">
+        <h4 className="text-xs font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+          What Benefits Connecting Your Mailbox Brings
+        </h4>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+          <div className="flex items-start gap-2.5">
+            <div className="w-7 h-7 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
+              <Sparkles className="w-3.5 h-3.5" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-zinc-900 dark:text-white">1-Tap Smart Convert to Quotes</p>
+              <p className="text-[11px] text-zinc-500 leading-relaxed mt-0.5">
+                Automatically extracts customer names, site addresses, job scopes, and pricing into a draft quote without manual typing in the van.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-2.5">
+            <div className="w-7 h-7 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 mt-0.5">
+              <Calendar className="w-3.5 h-3.5" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-zinc-900 dark:text-white">Direct Calendar Scheduling</p>
+              <p className="text-[11px] text-zinc-500 leading-relaxed mt-0.5">
+                Client arrival times, booked job dates, and site postcodes are scheduled straight into your calendar diary.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-2.5">
+            <div className="w-7 h-7 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 mt-0.5">
+              <Package className="w-3.5 h-3.5" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-zinc-900 dark:text-white">Automated Materials to The Shed</p>
+              <p className="text-[11px] text-zinc-500 leading-relaxed mt-0.5">
+                Merchant invoices and till receipts (e.g. Screwfix, Travis Perkins) pull item quantities straight into your stock holding.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-2.5">
+            <div className="w-7 h-7 rounded-xl bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 mt-0.5">
+              <Inbox className="w-3.5 h-3.5" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-zinc-900 dark:text-white">All Trade Comms in the Van</p>
+              <p className="text-[11px] text-zinc-500 leading-relaxed mt-0.5">
+                Review incoming client enquiries alongside your daily briefing and live job list in one place without swapping apps.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 4. Instant alternative: No setup required! */}
+      <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-200/80 dark:border-zinc-700/60 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-bold text-zinc-900 dark:text-white">Don't want to connect your inbox?</p>
+          <p className="text-[11px] text-zinc-500 mt-0.5">
+            You can copy and paste any email or client enquiry directly into Smart Convert right now.
+          </p>
+        </div>
+        <button
+          onClick={() => setSampleSmartCaptureOpen(true)}
+          className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 shrink-0 active:scale-95"
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          <span>Try with Sample Enquiry</span>
+        </button>
+      </div>
+    </div>
+  );
+
   // ─── Loading ─────────────────────────────────────────────────
   if (loading) {
     return (
@@ -212,23 +489,13 @@ export default function EmailView() {
   // ─── Error states ────────────────────────────────────────────
   if (error === 'not_connected' || error === 'token_expired') {
     return (
-      <div className="max-w-2xl mx-auto text-center py-16">
-        <div className="w-16 h-16 bg-zinc-100 dark:bg-zinc-800 rounded-2xl flex items-center justify-center mx-auto mb-4">
-          <Mail className="w-8 h-8 text-zinc-400" />
-        </div>
-        <h3 className="text-lg font-bold text-zinc-900 dark:text-white mb-2">
-          {error === 'token_expired' ? 'Session Expired' : 'No Email Account Connected'}
-        </h3>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-6">
-          Connect an email account in Settings to view trade emails, or use Smart Capture to scan invoices & quotes.
-        </p>
-        <button
-          onClick={() => fetchEmails()}
-          className="inline-flex items-center gap-2 px-6 py-3 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-bold rounded-xl hover:opacity-90 transition-all"
-        >
-          <RefreshCw className="w-4 h-4" />
-          Refresh
-        </button>
+      <div className="max-w-2xl mx-auto pb-32 px-2 sm:px-4">
+        <PageHeader
+          icon={Mail}
+          title="Email Inbox"
+          subtitle="Connect your mailbox to view customer enquiries"
+        />
+        {renderMailboxConnectGuide()}
       </div>
     );
   }
@@ -342,34 +609,7 @@ export default function EmailView() {
 
       {/* Email List */}
       {emails.length === 0 ? (
-        <div className="text-center py-12 max-w-md mx-auto">
-          <div className="w-16 h-16 bg-zinc-100 dark:bg-zinc-800/80 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-zinc-200 dark:border-zinc-700/50">
-            <Inbox className="w-8 h-8 text-zinc-400" />
-          </div>
-          <h3 className="text-base font-bold text-zinc-900 dark:text-white mb-1.5">No Emails Found</h3>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-6 leading-relaxed">
-            Connect your Gmail inbox or another email account to see customer inquiries, supplier invoices, merchant updates, and job notices here.
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5">
-            <button
-              onClick={() => {
-                setPasswordModalProvider('google');
-                setIsPasswordModalOpen(true);
-              }}
-              className="w-full sm:w-auto px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-xs active:scale-95 cursor-pointer"
-            >
-              <GoogleIcon className="w-4 h-4" isColoured={false} />
-              Connect Gmail
-            </button>
-            <button
-              onClick={() => fetchEmails()}
-              className="w-full sm:w-auto px-4 py-2.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              Refresh
-            </button>
-          </div>
-        </div>
+        renderMailboxConnectGuide()
       ) : (
         <div className="space-y-2">
           {emails.map((email) => {
@@ -626,6 +866,17 @@ export default function EmailView() {
           <SmartCaptureModal 
             onClose={() => setShowSmartCapture(null)} 
             initialEmailText={`Subject: ${showSmartCapture.subject}\nFrom: ${showSmartCapture.from}\nDate: ${showSmartCapture.date}\n\nContent:\n${stripHtml(showSmartCapture.body || showSmartCapture.snippet).substring(0, 5000)}`}
+            members={members}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Sample Smart Capture Modal */}
+      <AnimatePresence>
+        {sampleSmartCaptureOpen && (
+          <SmartCaptureModal 
+            onClose={() => setSampleSmartCaptureOpen(false)} 
+            initialEmailText={`Subject: Enquiry: Boiler service & bathroom radiator replacement\nFrom: Mrs Sarah Jenkins <sarah.jenkins@example.co.uk>\nDate: ${format(new Date(), 'dd/MM/yyyy')}\n\nHi Bob,\n\nHope you're well. Would you be able to come round next week to carry out an annual boiler service and check the system pressure?\n\nAlso, the heated towel rail in our upstairs family bathroom has started leaking from the bottom valve, so we'd love a price to supply and fit a modern chrome replacement.\n\nOur address is 14 Highfield Avenue, Guildford, GU1 2NE. Any weekday morning suits us best.\n\nMany thanks,\nSarah\n07700 900123`}
             members={members}
           />
         )}

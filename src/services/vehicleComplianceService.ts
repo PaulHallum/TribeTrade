@@ -149,7 +149,7 @@ export async function syncVehiclesToFirestoreEvents(
     });
 
     const currentYear = new Date().getFullYear();
-    const yearsToSync = [currentYear, currentYear + 1];
+    const yearsToSync = [currentYear, currentYear + 1, currentYear + 2];
 
     for (const year of yearsToSync) {
       const entries = getVehicleComplianceEntriesForYear(vehicles, year);

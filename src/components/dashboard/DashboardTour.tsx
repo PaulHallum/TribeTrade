@@ -54,11 +54,12 @@ export default function DashboardTour({
     return localStorage.getItem('tribe_tour_business_name') || localStorage.getItem('tribe_tour_family_name') || 'Apex Electrical & Solar';
   });
   const [tourTradeCraft, setTourTradeCraft] = useState('Electrician');
+  const [tourPhone, setTourPhone] = useState(() => localStorage.getItem('tribe_tour_phone') || '');
+  const [tourLocation, setTourLocation] = useState(() => localStorage.getItem('tribe_tour_location') || '');
+  const [tourHourlyRate, setTourHourlyRate] = useState(() => localStorage.getItem('tribe_tour_hourly_rate') || '45');
+  const [tourIsVatRegistered, setTourIsVatRegistered] = useState(false);
   const [isSavingBusinessName, setIsSavingBusinessName] = useState(false);
   const [savedBusinessNameSuccess, setSavedBusinessNameSuccess] = useState(false);
-  const [tourInviteCode, setTourInviteCode] = useState('482 910');
-  const [copiedCodeDemo, setCopiedCodeDemo] = useState(false);
-  const [sharedCodeDemo, setSharedCodeDemo] = useState(false);
 
   React.useEffect(() => {
     if (!tradeUserId) return;
@@ -71,13 +72,17 @@ export default function DashboardTour({
         if (data.tradeCraft) {
           setTourTradeCraft(data.tradeCraft);
         }
-        if (data.inviteCode) {
-          const raw = String(data.inviteCode);
-          if (raw.length === 6) {
-            setTourInviteCode(`${raw.slice(0, 3)} ${raw.slice(3)}`);
-          } else {
-            setTourInviteCode(raw);
-          }
+        if (data.phone) {
+          setTourPhone(data.phone);
+        }
+        if (data.townCity || data.postcode) {
+          setTourLocation([data.townCity, data.postcode].filter(Boolean).join(', '));
+        }
+        if (data.defaultHourlyRate) {
+          setTourHourlyRate(String(data.defaultHourlyRate));
+        }
+        if (data.isVatRegistered !== undefined) {
+          setTourIsVatRegistered(Boolean(data.isVatRegistered));
         }
       }
     });
@@ -89,19 +94,31 @@ export default function DashboardTour({
     if (!trimmed) return;
     setIsSavingBusinessName(true);
     try {
+      const parsedRate = parseFloat(tourHourlyRate) || 45;
+      const [townPart, postcodePart] = tourLocation.split(',').map(s => s.trim());
       if (tradeUserId) {
         await setDoc(doc(db, 'trade_users', tradeUserId), {
           businessName: trimmed,
           familyName: trimmed,
+          tradingName: trimmed,
           tradeCraft: tourTradeCraft,
+          phone: tourPhone.trim(),
+          townCity: townPart || tourLocation.trim(),
+          postcode: postcodePart || '',
+          defaultHourlyRate: parsedRate,
+          isVatRegistered: tourIsVatRegistered,
+          defaultVatRate: tourIsVatRegistered ? 20 : 0,
         }, { merge: true });
       }
       localStorage.setItem('tribe_tour_business_name', trimmed);
       localStorage.setItem('tribe_tour_family_name', trimmed);
+      localStorage.setItem('tribe_tour_phone', tourPhone);
+      localStorage.setItem('tribe_tour_location', tourLocation);
+      localStorage.setItem('tribe_tour_hourly_rate', tourHourlyRate);
       setSavedBusinessNameSuccess(true);
       setTimeout(() => setSavedBusinessNameSuccess(false), 3000);
     } catch (error) {
-      logger.error('Error saving business name from tour', error);
+      logger.error('Error saving business details from tour', error);
     } finally {
       setIsSavingBusinessName(false);
     }
@@ -144,35 +161,6 @@ export default function DashboardTour({
     setTimeout(() => setReceiptOcrScanning(false), 900);
   };
 
-  const handleCopyCodeDemo = () => {
-    setCopiedCodeDemo(true);
-    setTimeout(() => setCopiedCodeDemo(false), 2000);
-  };
-
-  const handleShareCodeDemo = async () => {
-    const cleanCode = tourInviteCode.replace(/\s+/g, '') || '482910';
-    const inviteUrl = `${window.location.origin}/?joinCode=${cleanCode}`;
-    const shareData = {
-      title: 'Join my Trade Team on TribeTrade',
-      text: `Join our trade crew on TribeTrade using 6-digit code: ${tourInviteCode}`,
-      url: inviteUrl,
-    };
-
-    if (navigator.share) {
-      try {
-        await navigator.share(shareData);
-      } catch (err) {
-        navigator.clipboard.writeText(inviteUrl);
-        setSharedCodeDemo(true);
-        setTimeout(() => setSharedCodeDemo(false), 2000);
-      }
-    } else {
-      navigator.clipboard.writeText(inviteUrl);
-      setSharedCodeDemo(true);
-      setTimeout(() => setSharedCodeDemo(false), 2000);
-    }
-  };
-
   const tourSteps = [
     // Step 0: Welcome to TribeTrade Hub
     {
@@ -198,10 +186,10 @@ export default function DashboardTour({
       icon: Mic,
       color: 'from-rose-500 to-pink-600',
     },
-    // Step 3: Quotes, Invoicing & 1-Click Payments
+    // Step 3: Quotes & Invoicing
     {
       badge: isTryTribeView ? 'Interactive Tour • Step 4 of 5' : 'Interactive Tour • Step 4 of 6',
-      title: 'Quotes, Invoicing & 1-Click Payments',
+      title: 'Quotes & Invoicing',
       subtitle: 'Draft professional PDF quotes, capture client deposits, and convert to invoice in 1 click.',
       icon: Receipt,
       color: 'from-purple-500 to-indigo-600',
@@ -217,7 +205,7 @@ export default function DashboardTour({
     ...(!isTryTribeView ? [{
       badge: 'Next Steps • Trade Business Setup Guide',
       title: 'Trade Business Setup Guide',
-      subtitle: 'Set your trading name, primary tradecraft, apprentice join code, and work tablet security PIN.',
+      subtitle: 'Set your trading name, primary tradecraft, rates, and contact details to get your quotes and invoices ready.',
       icon: Wrench,
       color: 'from-blue-600 to-cyan-600',
     }] : []),
@@ -690,7 +678,7 @@ export default function DashboardTour({
                             <Sparkles className="w-4 h-4 text-white" />
                           </div>
                           <span className="text-xs font-black uppercase tracking-widest text-zinc-600 dark:text-zinc-300">
-                            TRIBETRADE COPILOT
+                            TRIBE
                           </span>
                         </div>
                         <button
@@ -787,7 +775,7 @@ export default function DashboardTour({
                       ) : (
                         <>
                           <span className="text-zinc-800 dark:text-zinc-200 font-light mr-0.5 animate-pulse">|</span>
-                          <span className="text-zinc-400 font-medium">Ask TribeTrade...</span>
+                          <span className="text-zinc-400 font-medium">Ask Tribe...</span>
                         </>
                       )}
                     </div>
@@ -1253,30 +1241,36 @@ export default function DashboardTour({
                 <span className="text-[10px] font-bold bg-emerald-600 text-white px-2.5 py-0.5 rounded-full shadow-sm">Setup Guide</span>
               </div>
 
-              {/* Trading Name & Tradecraft Section */}
-              <div className="bg-emerald-50/60 dark:bg-emerald-950/20 p-4 rounded-2xl border border-emerald-500/20 space-y-3">
-                <div className="flex items-center justify-between">
+              {/* Expanded Trade Business Setup Section */}
+              <div className="bg-gradient-to-br from-emerald-50/70 via-teal-50/40 to-cyan-50/40 dark:from-emerald-950/20 dark:via-teal-950/20 dark:to-cyan-950/20 p-4 sm:p-5 rounded-2xl border border-emerald-500/20 space-y-4">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
                   <div>
                     <span className="text-[10px] font-bold tracking-wider uppercase text-emerald-600 dark:text-emerald-400 block mb-0.5">
-                      Business Identity
+                      Core Business Profile
                     </span>
                     <h4 className="text-xs sm:text-sm font-black text-zinc-900 dark:text-white">
-                      What is your trade business called?
+                      Get Your Business Ready for Quotes & Invoices
                     </h4>
                     <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
-                      Your trading name used on client quotes, tax invoices, and morning audio briefings.
+                      These details appear automatically on your customer PDF quotes, receipts, and VAT invoices.
                     </p>
                   </div>
                   {savedBusinessNameSuccess && (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-100/80 dark:bg-emerald-900/50 px-2.5 py-0.5 rounded-full animate-fade-in">
-                      <Check className="w-3 h-3 stroke-[3]" />
-                      Saved
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-100/90 dark:bg-emerald-900/60 px-3 py-1 rounded-full shadow-xs animate-fade-in">
+                      <Check className="w-3.5 h-3.5 stroke-[3]" />
+                      Profile Saved
                     </span>
                   )}
                 </div>
 
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
+                {/* 2-Column Inputs Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  {/* Trading Name */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <Building className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                      Trading / Company Name
+                    </label>
                     <input
                       type="text"
                       value={tourBusinessName}
@@ -1284,20 +1278,147 @@ export default function DashboardTour({
                         setTourBusinessName(e.target.value);
                         setSavedBusinessNameSuccess(false);
                       }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          handleSaveBusinessName();
-                        }
-                      }}
-                      placeholder="e.g. Apex Electrical & Solar, Harris & Sons Plumbing"
-                      className="w-full px-3.5 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs sm:text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:ring-2 focus:ring-emerald-500 outline-none transition-all shadow-xs"
+                      placeholder="e.g. Apex Electrical & Solar"
+                      className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:ring-2 focus:ring-emerald-500 outline-none transition-all shadow-2xs"
                     />
                   </div>
+
+                  {/* Contact Phone */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <Phone className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                      Contact Phone / Mobile
+                    </label>
+                    <input
+                      type="text"
+                      value={tourPhone}
+                      onChange={(e) => {
+                        setTourPhone(e.target.value);
+                        setSavedBusinessNameSuccess(false);
+                      }}
+                      placeholder="e.g. 07700 900123"
+                      className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:ring-2 focus:ring-emerald-500 outline-none transition-all shadow-2xs"
+                    />
+                  </div>
+
+                  {/* Town / Postcode */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <MapPin className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                      Base Town & Postcode
+                    </label>
+                    <input
+                      type="text"
+                      value={tourLocation}
+                      onChange={(e) => {
+                        setTourLocation(e.target.value);
+                        setSavedBusinessNameSuccess(false);
+                      }}
+                      placeholder="e.g. Guildford, GU1 2NE"
+                      className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:ring-2 focus:ring-emerald-500 outline-none transition-all shadow-2xs"
+                    />
+                  </div>
+
+                  {/* Default Hourly Labour Rate */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <PoundSterling className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                      Standard Labour Rate (£/hr)
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-zinc-400">£</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="5"
+                        value={tourHourlyRate}
+                        onChange={(e) => {
+                          setTourHourlyRate(e.target.value);
+                          setSavedBusinessNameSuccess(false);
+                        }}
+                        placeholder="45"
+                        className="w-full pl-7 pr-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:ring-2 focus:ring-emerald-500 outline-none transition-all shadow-2xs font-semibold"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* VAT Registration Status */}
+                <div className="pt-1 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                      UK VAT Status
+                    </span>
+                    <span className="text-[10px] text-zinc-400">
+                      {tourIsVatRegistered ? 'Standard 20% VAT applied to quotes' : 'No VAT added to customer quotes'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTourIsVatRegistered(false);
+                        setSavedBusinessNameSuccess(false);
+                      }}
+                      className={`px-3 py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer flex items-center justify-center gap-1.5 ${
+                        !tourIsVatRegistered
+                          ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white border-emerald-500 ring-2 ring-emerald-500/20 shadow-xs'
+                          : 'bg-zinc-100/80 dark:bg-zinc-800/40 text-zinc-500 border-zinc-200 dark:border-zinc-700'
+                      }`}
+                    >
+                      <span>Non-VAT / Exempt</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTourIsVatRegistered(true);
+                        setSavedBusinessNameSuccess(false);
+                      }}
+                      className={`px-3 py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer flex items-center justify-center gap-1.5 ${
+                        tourIsVatRegistered
+                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                          : 'bg-zinc-100/80 dark:bg-zinc-800/40 text-zinc-500 border-zinc-200 dark:border-zinc-700'
+                      }`}
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>VAT Registered (20%)</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Primary Tradecraft Chips */}
+                <div className="space-y-1.5 pt-1">
+                  <span className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block">
+                    Primary Tradecraft
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {['Electrician', 'Plumbing & Heating', 'Carpentry', 'General Building', 'Roofing', 'Painting & Decorating', 'Gas Engineer', 'Landscaping'].map((craft) => (
+                      <button
+                        key={craft}
+                        type="button"
+                        onClick={() => {
+                          setTourTradeCraft(craft);
+                          setSavedBusinessNameSuccess(false);
+                        }}
+                        className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                          tourTradeCraft === craft
+                            ? 'bg-emerald-600 text-white shadow-xs'
+                            : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200/80 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-700'
+                        }`}
+                      >
+                        {craft}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Save Trade Profile Action */}
+                <div className="pt-2 flex justify-end">
                   <button
                     type="button"
                     onClick={handleSaveBusinessName}
                     disabled={isSavingBusinessName || !tourBusinessName.trim()}
-                    className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs uppercase tracking-wider transition-all disabled:opacity-50 active:scale-95 flex items-center gap-1.5 shrink-0 shadow-xs cursor-pointer"
+                    className="w-full sm:w-auto px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs uppercase tracking-wider transition-all disabled:opacity-50 active:scale-95 flex items-center justify-center gap-2 shadow-xs cursor-pointer"
                   >
                     {isSavingBusinessName ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -1306,68 +1427,9 @@ export default function DashboardTour({
                     ) : (
                       <Save className="w-3.5 h-3.5" />
                     )}
-                    {savedBusinessNameSuccess ? 'Saved' : 'Save'}
+                    {savedBusinessNameSuccess ? 'Business Profile Saved' : 'Save Business Profile'}
                   </button>
                 </div>
-
-                {/* Tradecraft Chips */}
-                <div className="space-y-1 pt-1">
-                  <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Primary Tradecraft</span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {['Electrician', 'Plumbing & Heating', 'Carpentry', 'General Building', 'Roofing', 'Painting & Decorating'].map((craft) => (
-                      <button
-                        key={craft}
-                        type="button"
-                        onClick={() => {
-                          setTourTradeCraft(craft);
-                          saveTourBusinessName();
-                        }}
-                        className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
-                          tourTradeCraft === craft
-                            ? 'bg-emerald-600 text-white shadow-xs'
-                            : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200/80 dark:border-zinc-700 hover:bg-zinc-100'
-                        }`}
-                      >
-                        {craft}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* 6-Digit Crew & Apprentice Join Code */}
-              <div className="bg-gradient-to-r from-blue-500/10 to-cyan-500/10 p-4 rounded-2xl border border-blue-500/20 space-y-3">
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <div>
-                    <span className="text-[10px] font-bold tracking-wider uppercase text-blue-600 dark:text-blue-400 block mb-0.5">
-                      Your 6-Digit Crew & Apprentice Join Code
-                    </span>
-                    <div className="font-mono text-2xl font-black text-blue-700 dark:text-blue-300 tracking-[0.2em]">
-                      {tourInviteCode}
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={handleCopyCodeDemo}
-                      className="px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 rounded-xl text-xs font-bold shadow-sm border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
-                    >
-                      <Copy className="w-3.5 h-3.5 text-blue-600" />
-                      {copiedCodeDemo ? 'Copied!' : 'Copy Code'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleShareCodeDemo}
-                      className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md transition-all flex items-center gap-1.5 shrink-0 active:scale-95 cursor-pointer"
-                    >
-                      <Share2 className="w-3.5 h-3.5" />
-                      {sharedCodeDemo ? 'Link Copied!' : 'Share Crew Link'}
-                    </button>
-                  </div>
-                </div>
-                <p className="text-[11px] text-zinc-600 dark:text-zinc-300 leading-relaxed border-t border-blue-500/10 pt-2">
-                  Apprentices, subbies or office managers can join your trade hub in 1 step to view today's jobs, access site notes, and log materials from the van.
-                </p>
               </div>
 
               {/* Quick Setup Direct Links */}

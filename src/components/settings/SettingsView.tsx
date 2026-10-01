@@ -39,7 +39,9 @@ import {
   Tablet,
   Laptop,
   ChevronDown,
-  RotateCw
+  RotateCw,
+  Info,
+  Package
 } from 'lucide-react';
 import { 
   RegisteredDevice, 
@@ -1199,7 +1201,7 @@ export default function SettingsView({
                     Tribe Family Hub
                   </h4>
                   <p className="text-xs text-zinc-600 dark:text-zinc-400">
-                    Our sister assistant for shared family calendars, school inset days, and home schedules.
+                    Our sister assistant for shared family calendars, school circular reminders, meal planning, and shopping lists.
                   </p>
                 </div>
               </div>
@@ -1903,6 +1905,56 @@ export default function SettingsView({
 
             {openSections.accounts && (
               <div className="border-t border-zinc-100 dark:border-zinc-800/60">
+                {/* Mailbox Connection Guidance Banner */}
+                <div className="p-4 sm:p-5 bg-gradient-to-br from-indigo-50/60 via-blue-50/40 to-emerald-50/40 dark:from-indigo-950/20 dark:via-blue-950/15 dark:to-emerald-950/20 border-b border-zinc-100 dark:border-zinc-800 space-y-3">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5">
+                      <Sparkles className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className="text-sm font-bold text-zinc-900 dark:text-white">
+                        Why connect your email accounts?
+                      </h4>
+                      <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1 leading-relaxed">
+                        Signing in to TribeTrade (e.g. as <span className="font-semibold text-zinc-800 dark:text-zinc-200">{user?.email || 'bob@bobstrades.co.uk'}</span>) sets up your login credentials, but does <strong className="font-semibold text-zinc-900 dark:text-white">not</strong> automatically read your emails without your permission. Connecting your mailbox below allows TribeTrade to display customer enquiries and power Smart Convert.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Benefits Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                    <div className="p-3 bg-white/80 dark:bg-zinc-800/70 rounded-xl border border-zinc-200/60 dark:border-zinc-700/50">
+                      <div className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 font-bold text-xs mb-1">
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>Smart Convert Quotes</span>
+                      </div>
+                      <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-snug">
+                        Turn client enquiry emails into professional quotes and invoices with one tap.
+                      </p>
+                    </div>
+
+                    <div className="p-3 bg-white/80 dark:bg-zinc-800/70 rounded-xl border border-zinc-200/60 dark:border-zinc-700/50">
+                      <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 font-bold text-xs mb-1">
+                        <CalendarIcon className="w-3.5 h-3.5" />
+                        <span>Direct Diary Booking</span>
+                      </div>
+                      <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-snug">
+                        Extract customer site visit dates straight into your calendar and tasks.
+                      </p>
+                    </div>
+
+                    <div className="p-3 bg-white/80 dark:bg-zinc-800/70 rounded-xl border border-zinc-200/60 dark:border-zinc-700/50">
+                      <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold text-xs mb-1">
+                        <Package className="w-3.5 h-3.5" />
+                        <span>Materials to The Shed</span>
+                      </div>
+                      <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-snug">
+                        Automatically pull customer-requested fixtures and materials ready for pickup.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
           
           {/* 1. Google Services (Prominent Primary Integration) */}
@@ -1913,10 +1965,10 @@ export default function SettingsView({
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-zinc-900 dark:text-white truncate">Google Services</span>
-                  <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-[9px] font-black uppercase tracking-wider rounded-md border border-blue-100 dark:border-blue-800/30">Primary</span>
+                  <span className="text-sm font-bold text-zinc-900 dark:text-white truncate">Google Calendar Sync</span>
+                  <span className="px-2 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 text-[9px] font-black uppercase tracking-wider rounded-md border border-zinc-200 dark:border-zinc-700">Optional</span>
                 </div>
-                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">Live Google Calendar synchronisation</p>
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">Two-way live Google Calendar synchronisation (built-in diary works independently)</p>
               </div>
             </div>
             

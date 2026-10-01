@@ -2,6 +2,7 @@ import { setGlobalOptions } from "firebase-functions";
 import * as functions from "firebase-functions/v1";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 import * as admin from "firebase-admin";
 import * as textToSpeech from "@google-cloud/text-to-speech";
 
@@ -355,3 +356,197 @@ export const onSupportTicketCreated = onDocumentCreated("/support_tickets/{ticke
     console.error("Error creating support ticket task in admin family dashboard:", error);
   }
 });
+
+export const processDueReminders = onSchedule(
+  {
+    schedule: "every 1 minutes",
+    region: "europe-west2",
+    timeZone: "Europe/London",
+    retryCount: 1,
+    maxInstances: 1,
+  },
+  async () => {
+    const now = new Date();
+    // 2-hour freshness window: avoid blasting notifications for ancient overdue items
+    const freshnessWindow = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+    const appUrl = process.env.APP_URL || "https://tribetrader.web.app";
+    console.log(`[Scheduled Reminder Ticker] Starting run at ${now.toISOString()}`);
+
+    const collections = ["tasks", "calendarEvents"];
+    let totalSent = 0;
+
+    for (const col of collections) {
+      try {
+        const snap = await db.collectionGroup(col)
+          .where("notified", "==", false)
+          .where("reminderTime", "<=", now)
+          .where("reminderTime", ">=", freshnessWindow)
+          .get();
+
+        if (snap.empty) continue;
+
+        console.log(`[Scheduled Reminder Ticker] Found ${snap.size} reminders to process in '${col}'`);
+
+        for (const doc of snap.docs) {
+          const data = doc.data();
+          const tradeUserId = doc.ref.parent.parent?.id;
+          if (!tradeUserId) continue;
+
+          // Skip completed tasks and mark them as notified so they don't fire late reminders
+          if (col === "tasks" && (data.status === "completed" || data.status === "done")) {
+            await doc.ref.update({ notified: true });
+            continue;
+          }
+
+          const userSnap = await db.collection("users")
+            .where("tradeUserId", "==", tradeUserId)
+            .get();
+
+          if (userSnap.empty) {
+            await doc.ref.update({ notified: true });
+            continue;
+          }
+
+          // Get family config & members
+          const familySnap = await db.collection("trade_users").doc(tradeUserId).get();
+          const familyData = familySnap.data();
+          const notifyBothAdultsForChildTasks = familyData?.notifyBothAdultsForChildTasks ?? true;
+
+          const membersSnap = await db.collection("trade_users").doc(tradeUserId).collection("members").get();
+          const membersList = membersSnap.docs.map(mDoc => ({ id: mDoc.id, ...mDoc.data() }));
+
+          const memberRolesMap: Record<string, string> = {};
+          const memberUserIdMap: Record<string, string> = {};
+          membersList.forEach((m: any) => {
+            if (m.role) memberRolesMap[m.id] = String(m.role).toLowerCase();
+            if (m.userId) memberUserIdMap[m.id] = m.userId;
+          });
+
+          // Determine who is assigned
+          let notifyAll = false;
+          const assignedIds = Array.isArray(data.assignedTo)
+            ? data.assignedTo
+            : (data.assignedTo && data.assignedTo !== "all" ? [data.assignedTo] : []);
+
+          if (!data.assignedTo || data.assignedTo === "all" || assignedIds.length === 0) {
+            notifyAll = true;
+          }
+
+          // Check if any child is assigned
+          let childAssigned = false;
+          for (const id of assignedIds) {
+            const role = memberRolesMap[id];
+            if (role === "son" || role === "daughter" || role === "child" || role === "kid") {
+              childAssigned = true;
+              break;
+            }
+          }
+
+          // Determine target user IDs to notify
+          const targetUserIds = new Set<string>();
+
+          if (notifyAll || (childAssigned && notifyBothAdultsForChildTasks)) {
+            userSnap.docs.forEach(uDoc => targetUserIds.add(uDoc.id));
+          } else {
+            for (const id of assignedIds) {
+              const memberUserId = memberUserIdMap[id];
+              if (memberUserId) {
+                targetUserIds.add(memberUserId);
+              } else {
+                const memberDoc = membersList.find((m: any) => m.id === id) as any;
+                if (memberDoc) {
+                  userSnap.docs.forEach(uDoc => {
+                    const uData = uDoc.data();
+                    if (
+                      (memberDoc.email && uData.email === memberDoc.email) ||
+                      (memberDoc.name && uData.displayName === memberDoc.name)
+                    ) {
+                      targetUserIds.add(uDoc.id);
+                    }
+                  });
+                }
+              }
+            }
+            if (targetUserIds.size === 0) {
+              userSnap.docs.forEach(uDoc => targetUserIds.add(uDoc.id));
+            }
+          }
+
+          for (const uDoc of userSnap.docs) {
+            if (!targetUserIds.has(uDoc.id)) continue;
+
+            const settingsSnap = await db.collection("users").doc(uDoc.id).collection("settings").doc("notifications").get();
+            const settingsData = settingsSnap.data();
+
+            if (!settingsData || !settingsData.enabled) continue;
+
+            const tokens: string[] = [];
+            if (Array.isArray(settingsData.fcmTokens)) {
+              tokens.push(...settingsData.fcmTokens);
+            } else if (settingsData.fcmToken) {
+              tokens.push(settingsData.fcmToken);
+            }
+
+            const uniqueTokens = [...new Set(tokens)];
+            for (const token of uniqueTokens) {
+              try {
+                const isEvent = doc.ref.parent.id === "calendarEvents";
+                const view = isEvent ? "calendar" : "tasks";
+                const deepLink = `/?view=${view}&id=${doc.id}`;
+                const notifTitle = isEvent ? `📅 ${data.title || 'Job Booking'}` : `✅ ${data.title || 'Trade Task'}`;
+                const notifBody = data.description
+                  ? (data.description.length > 90 ? `${data.description.substring(0, 87)}...` : data.description)
+                  : (isEvent ? "Upcoming job booking in diary" : "Scheduled trade task due now");
+
+                await admin.messaging().send({
+                  token: token,
+                  notification: {
+                    title: notifTitle,
+                    body: notifBody,
+                  },
+                  data: {
+                    click_action: "FLUTTER_NOTIFICATION_CLICK",
+                    type: "reminder",
+                    id: doc.id,
+                    link: deepLink,
+                  },
+                  android: {
+                    priority: "high",
+                    notification: {
+                      channelId: "tribe_reminders",
+                      color: "#10b981",
+                      sound: "default",
+                    },
+                  },
+                  apns: {
+                    payload: { aps: { sound: "default", contentAvailable: true } },
+                  },
+                  webpush: {
+                    headers: { Urgency: "high" },
+                    notification: {
+                      icon: "/icon-192.png",
+                      badge: "/badge.svg",
+                      tag: doc.id,
+                    },
+                    fcmOptions: { link: `${appUrl}${deepLink}` },
+                  },
+                });
+                totalSent++;
+              } catch (sendError: any) {
+                console.warn(`[Scheduled Reminder Ticker] Failed to send to token:`, sendError.message);
+              }
+            }
+          }
+
+          // Mark as notified in Firestore so it doesn't trigger again
+          await doc.ref.update({ notified: true });
+        }
+      } catch (err: any) {
+        console.error(`[Scheduled Reminder Ticker] Error processing collection ${col}:`, err);
+      }
+    }
+
+    console.log(`[Scheduled Reminder Ticker] Run finished. Sent ${totalSent} notifications.`);
+  }
+);
+

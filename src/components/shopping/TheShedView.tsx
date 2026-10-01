@@ -12,7 +12,12 @@ import {
   ArrowRight,
   Briefcase,
   Loader2,
-  Star
+  Star,
+  RotateCcw,
+  CheckCircle2,
+  Check,
+  Calendar,
+  History
 } from 'lucide-react';
 import { db } from '../../lib/firebase';
 import { 
@@ -29,7 +34,17 @@ import { useToast } from '../../contexts/ToastContext';
 import { detectCategory } from '../../lib/shoppingUtils';
 import ConfirmModal from '../common/ConfirmModal';
 import AssignStockModal from './AssignStockModal';
-import { subscribeShedAllocations, ShedAllocationRecord, ShedStockItem } from '../../services/shedService';
+import { 
+  subscribeShedAllocations, 
+  unreserveStockAllocation,
+  unreserveJobAllocations,
+  markAllocationCompleted,
+  ShedAllocationRecord, 
+  ShedStockItem 
+} from '../../services/shedService';
+import { subscribeInvoices } from '../../services/invoiceService';
+import { subscribeQuotes } from '../../services/quoteService';
+import { Invoice, Quote } from '../../types/quote';
 
 interface TheShedViewProps {
   onSwitchToPickList?: () => void;
@@ -43,6 +58,10 @@ export default function TheShedView({ onSwitchToPickList }: TheShedViewProps) {
   const [stock, setStock] = useState<ShedStockItem[]>([]);
   const [allocations, setAllocations] = useState<ShedAllocationRecord[]>([]);
   const [loadingAllocations, setLoadingAllocations] = useState(false);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [invoicesLoaded, setInvoicesLoaded] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [name, setName] = useState('');
   const [quantity, setQuantity] = useState<number | string>(1);
   const [isKeyItem, setIsKeyItem] = useState(false);
@@ -81,9 +100,20 @@ export default function TheShedView({ onSwitchToPickList }: TheShedViewProps) {
       setLoadingAllocations(false);
     });
 
+    const unsubscribeInvoices = subscribeInvoices(tradeUserId, (invList) => {
+      setInvoices(invList);
+      setInvoicesLoaded(true);
+    });
+
+    const unsubscribeQuotes = subscribeQuotes(tradeUserId, (qList) => {
+      setQuotes(qList);
+    });
+
     return () => {
       unsubscribeStock();
       unsubscribeAllocations();
+      unsubscribeInvoices();
+      unsubscribeQuotes();
     };
   }, [tradeUserId]);
 
@@ -183,16 +213,68 @@ export default function TheShedView({ onSwitchToPickList }: TheShedViewProps) {
     }
   };
 
-  // Map of reserved quantities per stock item from job allocations
+  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+
+  // Determines if an allocation belongs to a job that has passed, was completed, or was deleted
+  const isAllocationPassedOrDeleted = (alloc: ShedAllocationRecord): boolean => {
+    // 1. Explicitly marked completed or unreserved
+    if (alloc.status === 'completed' || alloc.status === 'unreserved') {
+      return true;
+    }
+
+    // 2. Linked Invoice
+    if (alloc.targetType === 'invoice' && alloc.targetId) {
+      if (invoicesLoaded) {
+        const inv = invoices.find(i => i.id === alloc.targetId);
+        // If invoice was deleted, do not show in active jobs
+        if (!inv) return true;
+        // If invoice is completed or paid, job has passed
+        if (inv.status === 'completed' || inv.status === 'paid') return true;
+        // If jobDate was before today and invoice is not draft
+        if (alloc.jobDate && alloc.jobDate < todayStr && inv.status !== 'draft') {
+          return true;
+        }
+      }
+    }
+
+    // 3. Linked Quote
+    if (alloc.targetType === 'quote' && alloc.targetId) {
+      if (invoicesLoaded) {
+        const q = quotes.find(quote => quote.id === alloc.targetId);
+        // If quote was deleted, or declined, do not show in active jobs
+        if (!q || q.status === 'declined') return true;
+        if (alloc.jobDate && alloc.jobDate < todayStr && q.status !== 'accepted') {
+          return true;
+        }
+      }
+    }
+
+    // 4. Custom job with jobDate in the past
+    if (alloc.targetType === 'custom' && alloc.jobDate && alloc.jobDate < todayStr) {
+      return true;
+    }
+
+    return false;
+  };
+
+  const activeAllocations = useMemo(() => {
+    return allocations.filter(a => !isAllocationPassedOrDeleted(a));
+  }, [allocations, invoices, quotes, invoicesLoaded, todayStr]);
+
+  const pastAllocations = useMemo(() => {
+    return allocations.filter(a => isAllocationPassedOrDeleted(a));
+  }, [allocations, invoices, quotes, invoicesLoaded, todayStr]);
+
+  // Map of reserved quantities per stock item from active job allocations
   const reservedMap = useMemo(() => {
     const map: { [stockItemId: string]: number } = {};
-    for (const a of allocations) {
+    for (const a of activeAllocations) {
       if (a.stockItemId) {
         map[a.stockItemId] = Number(((map[a.stockItemId] || 0) + (Number(a.quantity) || 0)).toFixed(2));
       }
     }
     return map;
-  }, [allocations]);
+  }, [activeAllocations]);
 
   const totalItems = stock.length;
   const totalUnits = stock.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0);
@@ -233,23 +315,79 @@ export default function TheShedView({ onSwitchToPickList }: TheShedViewProps) {
 
   const categories = Array.from(new Set(stock.map(i => i.category || 'General Materials')));
 
+  const displayedAllocations = showHistory ? pastAllocations : activeAllocations;
+
   // Group allocations by target job/invoice
   const allocationsByJob = useMemo(() => {
-    const groups: { [key: string]: { jobTitle: string; customerName?: string; targetType: string; items: ShedAllocationRecord[] } } = {};
-    for (const alloc of allocations) {
+    const groups: { [key: string]: { jobTitle: string; customerName?: string; targetType: string; targetId?: string | null; jobDate?: string; items: ShedAllocationRecord[] } } = {};
+    for (const alloc of displayedAllocations) {
       const key = alloc.targetId || alloc.jobTitle;
       if (!groups[key]) {
         groups[key] = {
           jobTitle: alloc.jobTitle,
           customerName: alloc.customerName,
           targetType: alloc.targetType,
+          targetId: alloc.targetId,
+          jobDate: alloc.jobDate,
           items: []
         };
       }
       groups[key].items.push(alloc);
     }
     return Object.values(groups);
-  }, [allocations]);
+  }, [displayedAllocations]);
+
+  const handleUnreserveItem = (alloc: ShedAllocationRecord) => {
+    if (!tradeUserId || !alloc.id) return;
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Unreserve Stock Back to The Shed',
+      message: `Return ${alloc.quantity} ${alloc.unit || 'units'} of "${alloc.stockItemName}" from this job back into The Shed inventory?`,
+      confirmLabel: 'Unreserve Stock',
+      variant: 'info',
+      onConfirm: async () => {
+        try {
+          await unreserveStockAllocation(tradeUserId, alloc.id!);
+          showToast(`Unreserved ${alloc.quantity}x "${alloc.stockItemName}" back to The Shed`, 'success');
+        } catch (err: any) {
+          showToast('Failed to unreserve stock: ' + err.message, 'error');
+        }
+      }
+    });
+  };
+
+  const handleUnreserveJob = (jobGroup: { jobTitle: string; items: ShedAllocationRecord[] }) => {
+    if (!tradeUserId || !jobGroup.items?.length) return;
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Unreserve All Materials for Job',
+      message: `Return all ${jobGroup.items.length} reserved item(s) for "${jobGroup.jobTitle}" back into The Shed?`,
+      confirmLabel: 'Unreserve All',
+      variant: 'info',
+      onConfirm: async () => {
+        try {
+          await unreserveJobAllocations(tradeUserId, jobGroup.items);
+          showToast(`Unreserved all materials for "${jobGroup.jobTitle}" back to The Shed`, 'success');
+        } catch (err: any) {
+          showToast('Failed to unreserve job stock: ' + err.message, 'error');
+        }
+      }
+    });
+  };
+
+  const handleMarkJobCompleted = async (jobGroup: { jobTitle: string; items: ShedAllocationRecord[] }) => {
+    if (!tradeUserId || !jobGroup.items?.length) return;
+    try {
+      for (const item of jobGroup.items) {
+        if (item.id) {
+          await markAllocationCompleted(tradeUserId, item.id);
+        }
+      }
+      showToast(`Marked "${jobGroup.jobTitle}" as completed. Reserved stock archived.`, 'success');
+    } catch (err: any) {
+      showToast('Failed to mark job completed: ' + err.message, 'error');
+    }
+  };
 
   const filteredStock = stock.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -664,27 +802,47 @@ export default function TheShedView({ onSwitchToPickList }: TheShedViewProps) {
 
       {/* Reserved / Allocated Stock Grouped by Job */}
       <div className="pt-6 border-t border-zinc-200 dark:border-zinc-800 space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
             <h3 className="text-sm font-black uppercase tracking-wider text-zinc-900 dark:text-white flex items-center gap-2">
               <Briefcase className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-              Reserved & Allocated Stock by Job
+              {showHistory ? 'Past & Completed Stock Allocations' : 'Reserved & Allocated Stock by Job'}
             </h3>
             <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-              Stock items dedicated or reserved for active trade jobs and invoices
+              {showHistory
+                ? 'Historical records of stock assigned to completed, paid, or past jobs'
+                : 'Stock items dedicated or reserved for active trade jobs and invoices'}
             </p>
           </div>
-          {allocations.length > 0 && (
-            <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-              {allocations.length} allocated item{allocations.length === 1 ? '' : 's'}
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {pastAllocations.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowHistory(prev => !prev)}
+                className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 border ${
+                  showHistory
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                    : 'bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700'
+                }`}
+              >
+                <History className="w-3.5 h-3.5" />
+                <span>{showHistory ? 'View Active Jobs' : `Past Jobs (${pastAllocations.length})`}</span>
+              </button>
+            )}
+            {!showHistory && activeAllocations.length > 0 && (
+              <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                {activeAllocations.length} allocated item{activeAllocations.length === 1 ? '' : 's'}
+              </span>
+            )}
+          </div>
         </div>
 
         {allocationsByJob.length === 0 ? (
           <div className="p-6 bg-zinc-50 dark:bg-zinc-800/40 rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-800 text-center">
             <p className="text-xs text-zinc-400">
-              No stock is currently reserved for any jobs. Click "Assign to Job" on any stock item above to allocate materials to a trade invoice.
+              {showHistory
+                ? 'No past job allocations recorded.'
+                : 'No stock is currently reserved for any active jobs. Click "Assign to Job" on any stock item above to allocate materials.'}
             </p>
           </div>
         ) : (
@@ -694,12 +852,20 @@ export default function TheShedView({ onSwitchToPickList }: TheShedViewProps) {
                 key={idx}
                 className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 shadow-sm space-y-3"
               >
-                <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-2.5">
-                  <div className="min-w-0">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 mr-2">
-                      {jobGroup.targetType === 'invoice' ? 'Invoice' : 'Direct Job'}
-                    </span>
-                    <h4 className="text-xs font-bold text-zinc-900 dark:text-white truncate inline">
+                <div className="flex items-start justify-between border-b border-zinc-100 dark:border-zinc-800 pb-2.5 gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300">
+                        {jobGroup.targetType === 'invoice' ? 'Invoice' : jobGroup.targetType === 'quote' ? 'Quote' : 'Direct Job'}
+                      </span>
+                      {jobGroup.jobDate && (
+                        <span className="inline-flex items-center gap-1 text-[10px] text-zinc-500 dark:text-zinc-400 font-medium">
+                          <Calendar className="w-3 h-3 text-zinc-400" />
+                          {jobGroup.jobDate}
+                        </span>
+                      )}
+                    </div>
+                    <h4 className="text-xs font-bold text-zinc-900 dark:text-white truncate block mt-1">
                       {jobGroup.jobTitle}
                     </h4>
                     {jobGroup.customerName && (
@@ -708,26 +874,61 @@ export default function TheShedView({ onSwitchToPickList }: TheShedViewProps) {
                       </p>
                     )}
                   </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {!showHistory && (
+                      <button
+                        type="button"
+                        onClick={() => handleMarkJobCompleted(jobGroup)}
+                        title="Mark job as completed (clears stock from active reserved)"
+                        className="px-2 py-1 text-[10px] font-bold rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 transition-colors flex items-center gap-1"
+                      >
+                        <Check className="w-3 h-3" />
+                        <span>Job Done</span>
+                      </button>
+                    )}
+                    {jobGroup.items.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleUnreserveJob(jobGroup)}
+                        title="Unreserve all materials for this job back to The Shed"
+                        className="px-2 py-1 text-[10px] font-bold rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 transition-colors flex items-center gap-1"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>Unreserve All</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="space-y-1.5">
                   {jobGroup.items.map((it, itemIdx) => (
                     <div
                       key={it.id || itemIdx}
-                      className="flex items-center justify-between text-xs py-1.5 px-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-100 dark:border-zinc-800"
+                      className="flex items-center justify-between text-xs py-2 px-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-100 dark:border-zinc-800 gap-2"
                     >
-                      <span className="font-semibold text-zinc-800 dark:text-zinc-200">
-                        {it.stockItemName}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <span className="font-black text-blue-600 dark:text-blue-400">
-                          {it.quantity} {it.unit || 'units'} reserved
+                      <div className="min-w-0 flex-1">
+                        <span className="font-semibold text-zinc-800 dark:text-zinc-200 block truncate">
+                          {it.stockItemName}
                         </span>
                         {it.totalCharged > 0 && (
                           <span className="text-[10px] text-zinc-400">
                             (£{it.totalCharged.toFixed(2)})
                           </span>
                         )}
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="font-black text-blue-600 dark:text-blue-400">
+                          {it.quantity} {it.unit || 'units'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleUnreserveItem(it)}
+                          title="Unreserve stock back to The Shed"
+                          className="px-2 py-1 text-[11px] font-bold rounded-lg bg-zinc-200/80 hover:bg-amber-100 dark:bg-zinc-700 dark:hover:bg-amber-950/60 text-zinc-700 hover:text-amber-800 dark:text-zinc-200 dark:hover:text-amber-300 transition-colors flex items-center gap-1 shadow-2xs"
+                        >
+                          <RotateCcw className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                          <span>Unreserve</span>
+                        </button>
                       </div>
                     </div>
                   ))}

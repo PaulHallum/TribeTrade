@@ -13,6 +13,7 @@ import { syncToGoogleCalendar } from '../../services/googleCalendar';
 import CameraChoiceModal from '../common/CameraChoiceModal';
 import SmartCaptureModal from '../smart/SmartCaptureModal';
 import { combineDateTimeToISO, combineDateTimeToDate, formatToLocalDate } from '../../lib/dateUtils';
+import { calculateReminderTime } from '../../lib/reminderUtils';
 import { saveQuote, generateNextQuoteNumber, subscribeQuotes } from '../../services/quoteService';
 import { saveTransaction } from '../../services/receiptService';
 import { TRANSACTION_CATEGORIES, TransactionCategoryKey, PaymentMethod } from '../../types/transaction';
@@ -154,20 +155,26 @@ export default function QuickAddModal({ onClose, initialDate, restrictToType, in
     setLoading(true);
     try {
       if (type === 'event') {
-        const reminderTime = combineDateTimeToDate(date, time);
+        const startDateTime = combineDateTimeToDate(date, time);
         const endDateTime = combineDateTimeToDate(date, endTime);
-        const isTimeValid = reminderTime !== null;
+        const isTimeValid = startDateTime !== null;
         const finalEndTime = endDateTime && !isNaN(endDateTime.getTime()) 
           ? endDateTime 
-          : (isTimeValid ? new Date(reminderTime.getTime() + 3600000) : null);
+          : (isTimeValid ? new Date(startDateTime.getTime() + 3600000) : null);
         
+        const offset = settings?.defaultReminderOffset || 'at_time';
+        const calculatedReminder = isTimeValid ? calculateReminderTime(startDateTime, offset) : null;
+        const now = new Date();
+        const shouldResetNotified = calculatedReminder ? calculatedReminder >= new Date(now.getTime() - 15 * 60 * 1000) : false;
+
         const eventData = {
           title,
           description,
-          startTime: reminderTime,
+          startTime: startDateTime,
           endTime: finalEndTime,
-          reminderTime, // Mapping for background notifier
-          notified: false,
+          reminderTime: calculatedReminder,
+          reminderOffset: offset,
+          notified: !shouldResetNotified,
           location,
           isShared,
           assignedTo,
@@ -216,7 +223,7 @@ export default function QuickAddModal({ onClose, initialDate, restrictToType, in
           const gEvent = await syncToGoogleCalendar(googleAccessToken, {
             title: eventData.title,
             description: eventData.description,
-            startTime: reminderTime.toISOString(),
+            startTime: startDateTime.toISOString(),
             endTime: finalEndTime ? finalEndTime.toISOString() : undefined,
             location: eventData.location
           });
@@ -226,7 +233,12 @@ export default function QuickAddModal({ onClose, initialDate, restrictToType, in
           }
         }
       } else if (type === 'task') {
-        const reminderTime = !noSchedule ? combineDateTimeToDate(date, time) : null;
+        const dueDateTime = !noSchedule ? combineDateTimeToDate(date, time) : null;
+        const offset = settings?.defaultReminderOffset || 'at_time';
+        const calculatedReminder = dueDateTime ? calculateReminderTime(dueDateTime, offset) : null;
+        const now = new Date();
+        const shouldResetNotified = calculatedReminder ? calculatedReminder >= new Date(now.getTime() - 15 * 60 * 1000) : false;
+
         await addDoc(collection(db, 'trade_users', tradeUserId, 'tasks'), {
           title,
           description,
@@ -235,9 +247,10 @@ export default function QuickAddModal({ onClose, initialDate, restrictToType, in
           assignedTo,
           listId: listId || null,
           authorId: user.uid,
-          dueDate: reminderTime,
-          reminderTime, // Mapping for background notifier
-          notified: false,
+          dueDate: dueDateTime,
+          reminderTime: calculatedReminder,
+          reminderOffset: offset,
+          notified: !shouldResetNotified,
           recurrence,
           subtasks,
           createdAt: new Date().toISOString()

@@ -28,6 +28,7 @@ import { useToast } from '../../contexts/ToastContext';
 import { syncToGoogleCalendar } from '../../services/googleCalendar';
 import ReactMarkdown from 'react-markdown';
 import { parseAISODateToLocal } from '../../lib/dateUtils';
+import { calculateReminderTime } from '../../lib/reminderUtils';
 
 const getLocalDateString = (dateObj: Date | string) => {
   try {
@@ -241,6 +242,10 @@ export default function SmartConvertModal({ onClose, content, originalId, origin
       const taskAction = result.actions?.find(a => a.action === 'CREATE_TASK');
       const actionDueDate = taskAction?.data?.dueDate;
       const parsedDueDate = actionDueDate ? parseAISODateToLocal(actionDueDate) : null;
+      const offset = settings?.defaultReminderOffset || 'at_time';
+      const calcReminder = parsedDueDate ? calculateReminderTime(parsedDueDate, offset) : null;
+      const now = new Date();
+      const shouldReset = calcReminder ? calcReminder >= new Date(now.getTime() - 15 * 60 * 1000) : false;
 
       await addDoc(collection(db, 'trade_users', tradeUserId, 'tasks'), {
         title: result.title,
@@ -248,10 +253,12 @@ export default function SmartConvertModal({ onClose, content, originalId, origin
         authorId: user.uid,
         isShared: isShared,
         assignedTo: selectedAssignees.length > 0 ? (selectedAssignees.includes('all') ? 'all' : selectedAssignees) : 'all',
+
         status: 'pending',
         dueDate: parsedDueDate,
-        reminderTime: parsedDueDate,
-        notified: false,
+        reminderTime: calcReminder,
+        reminderOffset: offset,
+        notified: !shouldReset,
         createdAt: new Date().toISOString()
       });
       onClose();
@@ -285,13 +292,19 @@ export default function SmartConvertModal({ onClose, content, originalId, origin
         if (eventAction.data.location) location = eventAction.data.location;
       }
 
+      const offset = settings?.defaultReminderOffset || 'at_time';
+      const calcReminder = calculateReminderTime(startTime, offset);
+      const now = new Date();
+      const shouldReset = calcReminder ? calcReminder >= new Date(now.getTime() - 15 * 60 * 1000) : false;
+
       const docRef = await addDoc(collection(db, 'trade_users', tradeUserId, 'calendarEvents'), {
         title: result.title,
         description: result.expandedContent,
         startTime: startTime,
         endTime: endTime,
-        reminderTime: startTime, // Mapping for background notifier
-        notified: false,
+        reminderTime: calcReminder,
+        reminderOffset: offset,
+        notified: !shouldReset,
         location: location,
         authorId: user.uid,
         isShared: isShared,
@@ -330,6 +343,11 @@ export default function SmartConvertModal({ onClose, content, originalId, origin
         if (action === 'CREATE_TASK') {
           const isRSVP = data.title?.toLowerCase().includes('rsvp');
           const parsedDueDate = data.dueDate ? parseAISODateToLocal(data.dueDate) : null;
+          const offset = settings?.defaultReminderOffset || 'at_time';
+          const calcReminder = parsedDueDate ? calculateReminderTime(parsedDueDate, offset) : null;
+          const now = new Date();
+          const shouldReset = calcReminder ? calcReminder >= new Date(now.getTime() - 15 * 60 * 1000) : false;
+
           await addDoc(collection(db, 'trade_users', tradeUserId, 'tasks'), {
             title: data.title || result.title,
             description: data.description || '',
@@ -338,8 +356,9 @@ export default function SmartConvertModal({ onClose, content, originalId, origin
             assignedTo: selectedAssignees.length > 0 ? (selectedAssignees.includes('all') ? 'all' : selectedAssignees) : (data.assignedTo || 'all'),
             status: 'pending',
             dueDate: parsedDueDate,
-            reminderTime: parsedDueDate,
-            notified: false,
+            reminderTime: calcReminder,
+            reminderOffset: offset,
+            notified: !shouldReset,
             nudgeEnabled: isRSVP, // Forget-Me-Not Ping for RSVPs
             nudgeAt: parsedDueDate ? new Date(parsedDueDate.getTime() - 48 * 60 * 60 * 1000) : null,
             priority: isRSVP ? 'high' : 'medium',
@@ -347,13 +366,19 @@ export default function SmartConvertModal({ onClose, content, originalId, origin
           });
         } else if (action === 'CREATE_CALENDAR_EVENT') {
           const startTime = data.startTime ? parseAISODateToLocal(data.startTime) || new Date() : new Date();
+          const offset = settings?.defaultReminderOffset || 'at_time';
+          const calcReminder = calculateReminderTime(startTime, offset);
+          const now = new Date();
+          const shouldReset = calcReminder ? calcReminder >= new Date(now.getTime() - 15 * 60 * 1000) : false;
+
           const docRef = await addDoc(collection(db, 'trade_users', tradeUserId, 'calendarEvents'), {
             title: data.title || result.title,
             description: data.description || '',
             assignedTo: selectedAssignees.length > 0 ? (selectedAssignees.includes('all') ? 'all' : selectedAssignees) : (data.assignedTo || 'all'),
             startTime: startTime,
-            reminderTime: startTime, // Mapping for background notifier
-            notified: false,
+            reminderTime: calcReminder,
+            reminderOffset: offset,
+            notified: !shouldReset,
             location: data.location || '',
             authorId: user.uid,
             isShared: isShared,

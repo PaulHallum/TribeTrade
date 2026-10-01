@@ -24,7 +24,7 @@ Here is how to invite an apprentice or subbie to your Trade Hub:
 ### Quick Navigation: The TribeTrade Home Pill & Shimmer Menu Button
 TribeTrade provides swift, tactile navigation from any screen:
 - **TribeTrade Home Pill:** Located in the top-left corner, the high-contrast branded pill embeds the company logo on a clean white surface with your trade accent colour, providing 1-tap navigation directly back to your Trade Hub from any screen.
-- **Shimmer Menu Button:** Located in the top-right corner, an eye-catching themed button with a dynamic light-beam shimmer opens the full **Navigation Drawer** with 1-tap access to your Hub, Calendar, Quotes & Invoices, Expenses, Tasks, The Shed Supplies, Email, Settings, and User Guide.
+- **Shimmer Menu Button:** Located in the top-right corner, an eye-catching themed button with a dynamic light-beam shimmer opens the full **Navigation Drawer** with 1-tap access to your Hub, Calendar, Quotes & Invoices, Expenses & Mileage, Tasks, The Shed Supplies, Email, Settings, and User Guide.
 
 ---
 
@@ -55,11 +55,23 @@ TribeTrade is frequently installed on a dedicated tablet kept in the van or work
 2. You will be redirected to the secure login screen. Sign in using your registered Google, Microsoft, Apple, or Custom Work Email account.
 3. Once authenticated, the old PIN is disabled and you regain full access. You can configure a new PIN in Settings.
 
+### Account Registration & Password Complexity
+When registering with an Email & Password, passwords must satisfy our enhanced security requirements:
+- **Length:** 6 to 25 characters.
+- **Complexity:** Must contain at least **1 uppercase letter (A-Z)**, at least **1 number (0-9)**, and at least **1 special character** (e.g. `!@#$%^&*`).
+- **Interactive Visual Checklist:** As you type your password, real-time indicators turn green once each criterion is fulfilled.
+
+### In-App Email Verification & Resend
+- Upon registration, an automatic confirmation email with a secure verification link is sent to your inbox.
+- **Instant In-App Verification:** Clicking the link in your email automatically opens TribeTrade and verifies your account in 1 step using secure client-side action code processing.
+- **Scanner Pre-fetch Protection:** Even if corporate or mobile mail scanners (such as Outlook Safe Links or Gmail scanner) pre-fetch the link, TribeTrade automatically refreshes your account status so your session is marked as verified without displaying false expiration errors.
+- **Resend Verification:** If you ever need a fresh link, tap **Resend Email** in the persistent top banner.
+
 ---
 
 ## 4. Free vs Premium Subscription: Features & Limits
 
-TribeTrade operates on a straightforward, transparent model. Every new user enjoys an unrestricted **21-day free trial** of all Premium AI features. After the trial, you can continue on the **Free Tier (£0 forever)** or upgrade to **Premium** at £7.95/month (or £79.00/year, saving 17% with 2 months free).
+TribeTrade operates on a straightforward, transparent model. Every new user enjoys an unrestricted **21-day free trial** of all Premium AI features. A persistent top notification banner and header badge display your remaining trial days and warn you when your trial is expiring, with 1-tap access to your subscription settings. After the trial, you can continue on the **Free Tier (£0 forever)** or upgrade to **Premium** at £7.95/month (or £79.00/year, saving 17% with 2 months free).
 
 ### Side-by-Side Feature Comparison
 
@@ -82,7 +94,7 @@ TribeTrade operates on a straightforward, transparent model. Every new user enjo
 *Fair Use Policy: To guarantee high availability, Premium includes up to 50 AI requests per day, resetting at midnight UK time.*
 
 ### The Tribe Ecosystem & Tribe Family Hub
-TribeTrade is part of the **Tribe Family** suite of assistants. While TribeTrade powers your business on the tools, **Tribe Family Hub** ([tribefamilyhub.uk/try](https://tribefamilyhub.uk/try)) is our sister assistant for managing shared family calendars, school inset days, and household schedules. A direct link is available under **Settings > Account & Subscription**.
+TribeTrade is part of the **Tribe Family** suite of assistants. While TribeTrade powers your business on the tools, **Tribe Family Hub** ([tribefamilyhub.uk/try](https://tribefamilyhub.uk/try)) is our sister assistant for managing shared family calendars, school circular reminders, meal planning, and shopping lists. A direct link is available under **Settings > Account & Subscription**.
 
 ---
 
@@ -140,7 +152,7 @@ Before sharing your first quote, go to **Settings** > **Business Details & Quota
 2. Use the top toggle to switch between **Quotes** and **Invoices** (just like Tasks & Notes).
 3. Tap **+ New Quote**.
 4. Fill in customer details and multiline job scope (rendered in full on the A4 PDF export without truncation).
-5. Tap **+ Day Rate** or **+ Hourly Rate** to add labour using your preset standard rates from Settings (or enter custom days/hours with automatic rate switching), or **+ Add Material / Consumable** with preset units (`litres`, `tins`, `pack`, `bags`, `metres`, `sq m`, `rolls`, `units`, or custom).
+5. Tap **+ Day Rate** or **+ Hourly Rate** to add labour using your preset standard rates from Settings (or enter custom days/hours with automatic rate switching), or **+ Add Material / Consumable** with preset units (`litres`, `tins`, `pack`, `bags`, `metres`, `sq m`, `rolls`, `units`, or custom). Every item clearly shows its full quantity and unit (e.g. `3 hours`, `1 day`, `1 units`) across quote previews, invoice modals, and PDF exports.
 6. View live calculations of Labour Subtotal, Materials Subtotal, Net Subtotal, VAT (if registered), and Grand Total in British Pounds (£).
 7. Tap **Save Draft** or **Preview & Share**.
 
@@ -238,7 +250,7 @@ Located right next to the MTD export button, tap **Self Assessment Helper** to o
 
 ## 8. Van Mileage Log & Automated Route Calculation (HMRC 45p/mi)
 
-Accessible from **Expenses** (tap **Van Mileage Log**) or from **Settings > Fleet & MOT**, the Van Mileage Log tracks business journeys, customer call-outs, and merchant trips for HMRC simplified vehicle tax deductions (45p per business mile up to 10,000 miles):
+Accessible from **Expenses & Mileage** (via the **Van Mileage** tab) or from **Settings > Fleet & MOT**, the Van Mileage Log tracks business journeys, customer call-outs, and merchant trips for HMRC simplified vehicle tax deductions (45p per business mile up to 10,000 miles):
 
 - **Vehicle Dropdown Selection:** Select any vehicle registered in your Fleet & MOT settings directly from a clean dropdown list (e.g. *Ford Transit (VA21 XYZ)*). If driving a temporary replacement or hire van, choose `+ Different / Hire Vehicle` to log custom details.
 - **Base Workshop Address Auto-Fill:** The **From (Start)** field automatically populates with your real registered business address and postcode from **Settings > Business & Rates** (e.g. *Unit 4 Trade Park, Guildford GU1 4RF*). Tap **Use Base** at any time to instantly reset the starting point to your workshop or home depot.
@@ -247,8 +259,8 @@ Accessible from **Expenses** (tap **Van Mileage Log**) or from **Settings > Flee
   - The built-in driving engine resolves UK postcodes and road routes to calculate exact road driving distance in miles.
   - **No Google Cloud API Keys Required:** Runs on high-speed UK open data (Postcodes.io and OSRM road network), costing £0 and requiring zero setup.
 - **1-Tap Return Trip (2x):** Tap **🔁 Return Trip (2x)** to automatically double one-way mileage for round-trip callouts.
-- **Clean Consistent Ledger:** Mileage entries are displayed with UK dates (`DD/MM/YYYY`) and refined typography matching the main Expenses & Bookkeeping ledger.
-- **Export Accountant CSV:** Download a detailed travel report including dates, reg, purpose, start/end locations, odometer readings, and claim values formatted for your annual tax return or bookkeeper.
+- **Clean Consistent Ledger:** Mileage entries are displayed with UK dates (`DD/MM/YYYY`) and styled to automatically inherit your chosen app theme colour.
+- **Export Accountant CSV & Accounting Tools:** Located at the base of the mileage view alongside the Self Assessment preparation assistant and statutory AI tool financial notice, download an HMRC-ready vehicle mileage CSV report including dates, registration, purpose, start/end locations, and allowable claim values for your tax return.
 
 ---
 
@@ -268,16 +280,15 @@ Keeping work vans, pick-ups, and trade transport road-legal is critical. TribeTr
 4. Enter optional garage or policy notes (e.g. policy number, local testing station).
 5. Tap **Save Fleet Changes**.
 
-### Automatic Calendar Integration & 1-Month Reminders
-Because transport deadlines are configured in **Settings**, they are **forced into your calendar automatically every single year**:
+### Automatic Annual Recurrence & 1-Month Reminders
+Once you set your upcoming due dates in **Settings**, TribeTrade **automatically recurs your MOT, servicing, and insurance every year** across your calendar and Hub whiteboard:
 - **Entry 1: 1-Month Advance Reminder:** Exactly 1 calendar month before the due date, an amber reminder entry is posted (e.g. `⚠️ 1 Month Reminder: MOT Due - Primary Work Van (VA21 XYZ)`). This provides sufficient advance notice to book an MOT slot or shop around for insurance renewals.
 - **Entry 2: Due Date:** On the actual deadline, a red alert entry appears (e.g. `🚨 MOT DUE TODAY - Primary Work Van (VA21 XYZ)`).
-- **Annual Recurrence:** Whether browsing 2026, 2027, or 2028, compliance dates automatically recur annually without requiring manual re-entry.
+- **Zero Manual Year Clicking:** You do not need to click a "+1 Yr" button to create subsequent years. Compliance cycles project automatically year after year.
 
-### 1-Click Renewal (+1 Year)
-When your MOT passes or your van completes its annual service:
-- Open the entry in your Calendar and tap **Renew for Next Year (+1 Yr)** (or tap **+1 Yr** in Settings).
-- Tribe instantly pushes the due date forward by exactly 1 year and updates the calendar.
+### Deleting Entries & Replacing Vehicles
+- **Deleting an Entry from the Hub or Calendar:** Tap any vehicle reminder on the Hub or Calendar and tap **Delete Entry** to remove it. This instantly clears the reminder and updates your fleet record.
+- **Replacing or Deleting a Vehicle:** When you sell or replace a vehicle, tap the delete icon next to that vehicle under **Settings > Vehicle & Transport Fleet Compliance**. The vehicle and all of its associated calendar reminders are immediately purged from both the Calendar and the Hub.
 
 ---
 
@@ -312,7 +323,7 @@ TribeTrade replaces the cluttered horizontal menu bar with a streamlined, full-h
 - **Top-Right Menu Burger (☰):** Tapping or clicking the burger icon smoothly slides out the Navigation Drawer:
   - **Account & Plan Status:** Displays your active trade login and current plan badge (*Trial Days Remaining*, *Premium*, or *Free Tier*).
   - **Core Navigation:** Instant 1-tap jump to **Hub (Home)** and **Calendar**.
-  - **Business Workflow:** Dedicated links to **Quotes & Invoices**, **Expenses**, **Tasks**, **Supplies (The Shed)**, **Email**, and **Support**.
+  - **Business Workflow:** Dedicated links to **Quotes & Invoices**, **Expenses & Mileage**, **Tasks**, **Supplies (The Shed)**, **Email**, and **Support**.
   - **System & Help:** Direct access to **Settings & Sync** and the **User Guide**.
   - **Sign Out:** Secure 1-tap sign-out at the base of the drawer.
 - **Dismissal:** Automatically closes when an option is selected, when clicking the backdrop, or by pressing the Escape key.
@@ -338,9 +349,30 @@ To ensure Settings remains clean, fast, and uncluttered on mobile and desktop sc
 ## 13. Connected Email Accounts & Resilient Cloud Sync
 
 TribeTrade connects directly to your trade email inboxes to sync client enquiries, merchant delivery notes, and supplier invoices:
-- **Supported Providers:** Gmail, Microsoft Outlook / Office 365, Sky / Yahoo Mail, and Apple Mail (iCloud).
-- **Secure Gmail IMAP Connection:** Connect Gmail accounts securely using a 16-character **Google App Password**. This eliminates expensive Google restricted API fees and keeps your master Google account password completely private.
-- **Resilient Direct Cloud Sync:** In addition to backend API connections, TribeTrade features an automated direct cloud fallback that stores and manages your connected account credentials directly within your authenticated Firestore Trade Hub profile (`trade_users/{tradeUserId}/connectedAccounts`). Even if backend web services are temporarily offline or routing through static CDNs, your Gmail connection succeeds immediately and displays as active across all crew devices.
+
+### 13.1 Why Emails Aren't Visible Automatically
+- **Identity vs Mailbox Access:** When you sign in to TribeTrade using your email (e.g. `bob@bobstrades.co.uk`), Firebase securely verifies your **login identity**, but it does **not** grant TribeTrade permission to inspect or read your private personal or company email inbox.
+- **Privacy & Security by Design:** Your email provider (Microsoft, Google, Apple, Sky/Yahoo) requires explicit authorization before any third-party app can read messages. TribeTrade will never access your inbox without your consent.
+
+### 13.2 How to Connect Your Mailbox (Step-by-Step)
+You can connect your preferred mailbox in seconds via **Email** or **Settings > Connected Accounts**:
+1. **Microsoft 365 / Outlook / Hotmail:** Click **Connect Microsoft** to authorize via secure 1-click Microsoft OAuth.
+2. **Google Workspace / Gmail:** Click **Connect Gmail** and enter your 16-character **Google App Password**. This keeps your master Google password completely private and eliminates restricted API fees.
+3. **Apple Mail / iCloud:** Click **Connect Apple Mail** and use an **App-Specific Password** generated in your Apple ID portal.
+4. **Sky Mail / Yahoo:** Click **Connect Yahoo / Sky** to authenticate via OAuth or secure IMAP.
+
+### 13.3 Key Benefits of Connecting Your Mailbox
+- ⚡ **1-Tap Smart Convert to Quotes & Invoices:** TribeTrade scans incoming customer enquiries and automatically extracts names, property addresses, work requested, and dates into fully itemised quotes.
+- 📅 **Direct Diary & Visit Scheduling:** Automatically identifies proposed survey dates, site visits, or installation times and adds them straight into your Job Diary.
+- 📦 **Materials to The Shed:** Identifies fixtures, fittings, and trade supplies requested by the customer and queues them ready for collection or merchant ordering.
+- 🚐 **Unified Trade Inbox in the Van:** Review all your trade enquiries in one fast, clutter-free mobile screen without hopping between different email apps.
+
+### 13.4 Instant Alternative: Copy & Paste / Try Sample Enquiry
+- **No Setup Required:** If you do not wish to connect your mailbox, you can simply copy any client email, WhatsApp message, or voicemail note and paste it directly into **Smart Convert** (`✨ Smart Convert` button in the top header or Email screen).
+- **Try with Sample Enquiry:** In the Email screen, tap **Try with Sample Enquiry** to instantly experience how TribeTrade turns a typical UK trade enquiry (boiler service and bathroom radiator replacement) into a quote, diary visit, and parts list in seconds.
+
+### 13.5 Resilient Direct Cloud Sync
+- In addition to backend API connections, TribeTrade features an automated direct cloud fallback that stores and manages your connected account credentials directly within your authenticated Firestore Trade Hub profile (`trade_users/{tradeUserId}/connectedAccounts`). Even if backend web services are temporarily offline or routing through static CDNs, your connection succeeds immediately and displays as active across all crew devices.
 
 ---
 
@@ -388,5 +420,35 @@ If you ever wish to permanently close your account and delete your stored trade 
 3. Tap **Delete Account & Data**.
 4. Confirm the warning popup.
 5. TribeTrade will immediately purge your business data, quotes, invoices, and expenses from Firestore, remove your user record from Firebase Authentication, and sign you out cleanly.
+
+---
+
+## 17. The Shed: Van Stock, Job Allocations & Unreserving Materials
+
+The Shed keeps track of materials, consumables, and van inventory across your workshop and jobs.
+
+### 17.1 Assigning Stock to Invoices, Quotes & Direct Jobs
+1. Go to **The Shed** from the navigation drawer.
+2. Next to any stock item with available quantity, tap **Assign to Job**.
+3. Choose whether to allocate materials to an existing **Trade Invoice**, **Quote**, or enter a **Direct Job**.
+4. Select the quantity and optional unit price to bill the customer, and set the scheduled job date.
+5. Tap **Assign Stock to Job**. The materials will be reserved for that job and added to the invoice or quote line items.
+
+### 17.2 Unreserving Stock Back to The Shed
+If a job is cancelled, rescheduled, or materials are no longer required on site:
+- **Unreserve an Individual Item:** In The Shed, scroll down to **Reserved & Allocated Stock by Job**. Next to the item you wish to release, tap **Unreserve**. TribeTrade will immediately restore that quantity back into your available stock inventory in The Shed, recalculate or remove the item from the invoice/quote, and clear the reservation.
+- **Unreserve All:** Tap **Unreserve All** in the job card header to return all allocated materials for that job back to The Shed in one tap.
+
+### 17.3 Automatic Cleanup When Invoices or Quotes Are Deleted
+When you delete an invoice or quote:
+- TribeTrade automatically detects any materials that were allocated to that job.
+- The allocated quantities are immediately returned to your inventory in The Shed.
+- The job reservation is removed from The Shed so you never have ghost or orphaned reserved items cluttering your view.
+
+### 17.4 Passed and Completed Jobs
+Once a job is finished or past:
+- When an invoice is marked as **Completed** or **Paid**, or when a job's scheduled date has passed, it is automatically removed from the active **Reserved Stock by Job** section so you only see materials reserved for upcoming work.
+- **Job Done Action:** Tap **Job Done** on any active job card to mark it completed on site, archiving the reservation.
+- **Past Jobs History:** Tap **Past Jobs** in the header at any time to review historical material allocations.
 
 

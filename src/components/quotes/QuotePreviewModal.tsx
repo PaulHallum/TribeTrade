@@ -225,7 +225,7 @@ export default function QuotePreviewModal({
                     <td className="py-2.5 px-3 font-medium text-zinc-800 dark:text-zinc-200">{item.description}</td>
                     <td className="py-2.5 px-2 text-zinc-500 capitalize">{item.type}</td>
                     <td className="py-2.5 px-2 text-right text-zinc-600 dark:text-zinc-400 font-medium">
-                      {item.unit?.includes('d') || item.unit?.includes('h')
+                      {item.unit && /^\d/.test(item.unit.trim())
                         ? item.unit
                         : (item.unit ? `${item.quantity} ${item.unit}` : item.quantity)}
                     </td>

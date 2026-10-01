@@ -159,78 +159,28 @@ export default function AuthScreen() {
           </div>
         </div>
 
-        {/* Supported Email Account Sign In Options */}
+        {/* Sign In & Sign Up Options */}
         <div className="space-y-2.5 sm:space-y-3 mb-6">
           <div className="text-xs font-extrabold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-2 sm:mb-3">
-            Select your email account to sign in:
+            Sign in or create account:
           </div>
 
-          {/* 1. Google */}
+          {/* 1. Primary: Work Email & Password / Any Domain */}
           <button
-            onClick={() => signIn()}
+            onClick={() => setIsEmailModalOpen(true)}
             disabled={connectingProvider !== null}
-            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-4 rounded-[20px] flex items-center justify-between shadow-lg shadow-emerald-500/20 transition-all active:scale-[0.98] group disabled:opacity-50"
+            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-4 rounded-[20px] flex items-center justify-between shadow-lg shadow-emerald-500/20 transition-all active:scale-[0.98] group disabled:opacity-50 cursor-pointer"
           >
             <div className="flex items-center gap-3">
               <div className="w-7 h-7 bg-white rounded-xl flex items-center justify-center transition-colors">
-                <GoogleIcon className="w-4 h-4" isColoured={true} />
+                <Mail className="w-4 h-4 text-emerald-600" />
               </div>
-              <span className="text-xs font-black uppercase tracking-wider">Sign In with Google</span>
-            </div>
-            <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-bold uppercase">Workspace / Gmail</span>
-          </button>
-
-          {/* 2. Microsoft / Outlook */}
-          <button
-            onClick={() => handleProviderSignIn('microsoft')}
-            disabled={connectingProvider !== null}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-4 rounded-[20px] flex items-center justify-between shadow-lg shadow-blue-500/20 transition-all active:scale-[0.98] group disabled:opacity-50"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-7 h-7 bg-white rounded-xl flex items-center justify-center transition-colors">
-                {connectingProvider === 'microsoft' ? (
-                  <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
-                ) : (
-                  <MicrosoftIcon className="w-4 h-4" isColoured={true} />
-                )}
+              <div className="text-left">
+                <span className="text-xs font-black uppercase tracking-wider block">Work Email & Password</span>
+                <span className="text-[10px] text-emerald-100 font-medium block">e.g. bob@bobstrades.co.uk</span>
               </div>
-              <span className="text-xs font-black uppercase tracking-wider">Sign In with Outlook</span>
             </div>
-            <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-bold uppercase">M365 / Outlook</span>
-          </button>
-
-          {/* 3. Sky Mail & Yahoo Mail */}
-          <button
-            onClick={() => handleProviderSignIn('yahoo')}
-            disabled={connectingProvider !== null}
-            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3.5 px-4 rounded-[20px] flex items-center justify-between shadow-lg shadow-purple-500/20 transition-all active:scale-[0.98] group disabled:opacity-50"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-7 h-7 bg-white rounded-xl flex items-center justify-center transition-colors">
-                {connectingProvider === 'yahoo' ? (
-                  <Loader2 className="w-4 h-4 text-purple-600 animate-spin" />
-                ) : (
-                  <YahooIcon className="w-4 h-4" isColoured={true} />
-                )}
-              </div>
-              <span className="text-xs font-black uppercase tracking-wider">Sign In with Sky / Yahoo</span>
-            </div>
-            <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-bold uppercase">Sky / Yahoo</span>
-          </button>
-
-          {/* 4. Apple Mail (iCloud) */}
-          <button
-            onClick={() => setIsICloudModalOpen(true)}
-            disabled={connectingProvider !== null}
-            className="w-full bg-zinc-900 hover:bg-black text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-900 font-bold py-3.5 px-4 rounded-[20px] flex items-center justify-between shadow-lg shadow-zinc-900/10 transition-all active:scale-[0.98] group disabled:opacity-50 cursor-pointer"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-7 h-7 bg-white dark:bg-zinc-900 rounded-xl flex items-center justify-center transition-colors">
-                <AppleIcon className="w-4 h-4 text-zinc-900 dark:text-white" isColoured={false} />
-              </div>
-              <span className="text-xs font-black uppercase tracking-wider">Sign In with iCloud</span>
-            </div>
-            <span className="text-[10px] bg-white/20 dark:bg-zinc-900/20 px-2 py-0.5 rounded-full font-bold uppercase">Apple / iCloud</span>
+            <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-bold uppercase">Sign Up / In</span>
           </button>
 
           {/* Divider */}
@@ -239,26 +189,76 @@ export default function AuthScreen() {
               <div className="w-full border-t border-zinc-200 dark:border-zinc-800" />
             </div>
             <div className="relative flex justify-center text-[10px] uppercase">
-              <span className="bg-white dark:bg-zinc-950 px-2.5 text-zinc-400 font-bold tracking-wider">or custom email</span>
+              <span className="bg-white dark:bg-zinc-950 px-2.5 text-zinc-400 font-bold tracking-wider">or 1-click sign in with</span>
             </div>
           </div>
 
-          {/* 5. Custom Work Email / Any Domain */}
+          {/* 2. Google */}
           <button
-            onClick={() => setIsEmailModalOpen(true)}
+            onClick={() => signIn()}
+            disabled={connectingProvider !== null}
+            className="w-full bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-900/80 dark:hover:bg-zinc-800 text-zinc-900 dark:text-white font-bold py-3 px-4 rounded-[20px] flex items-center justify-between border border-zinc-200 dark:border-zinc-750 shadow-sm transition-all active:scale-[0.98] group disabled:opacity-50"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-7 h-7 bg-white dark:bg-zinc-800 rounded-xl flex items-center justify-center border border-zinc-200 dark:border-zinc-700 transition-colors shadow-xs">
+                <GoogleIcon className="w-4 h-4" isColoured={true} />
+              </div>
+              <span className="text-xs font-black uppercase tracking-wider">Google</span>
+            </div>
+            <span className="text-[10px] bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 px-2 py-0.5 rounded-full font-bold uppercase">Workspace / Gmail</span>
+          </button>
+
+          {/* 3. Microsoft / Outlook */}
+          <button
+            onClick={() => handleProviderSignIn('microsoft')}
+            disabled={connectingProvider !== null}
+            className="w-full bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-900/80 dark:hover:bg-zinc-800 text-zinc-900 dark:text-white font-bold py-3 px-4 rounded-[20px] flex items-center justify-between border border-zinc-200 dark:border-zinc-750 shadow-sm transition-all active:scale-[0.98] group disabled:opacity-50"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-7 h-7 bg-white dark:bg-zinc-800 rounded-xl flex items-center justify-center border border-zinc-200 dark:border-zinc-700 transition-colors shadow-xs">
+                {connectingProvider === 'microsoft' ? (
+                  <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
+                ) : (
+                  <MicrosoftIcon className="w-4 h-4" isColoured={true} />
+                )}
+              </div>
+              <span className="text-xs font-black uppercase tracking-wider">Microsoft 365 / Outlook</span>
+            </div>
+            <span className="text-[10px] bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 px-2 py-0.5 rounded-full font-bold uppercase">M365 / Outlook</span>
+          </button>
+
+          {/* 4. Sky Mail & Yahoo Mail */}
+          <button
+            onClick={() => handleProviderSignIn('yahoo')}
+            disabled={connectingProvider !== null}
+            className="w-full bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-900/80 dark:hover:bg-zinc-800 text-zinc-900 dark:text-white font-bold py-3 px-4 rounded-[20px] flex items-center justify-between border border-zinc-200 dark:border-zinc-750 shadow-sm transition-all active:scale-[0.98] group disabled:opacity-50"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-7 h-7 bg-white dark:bg-zinc-800 rounded-xl flex items-center justify-center border border-zinc-200 dark:border-zinc-700 transition-colors shadow-xs">
+                {connectingProvider === 'yahoo' ? (
+                  <Loader2 className="w-4 h-4 text-purple-600 animate-spin" />
+                ) : (
+                  <YahooIcon className="w-4 h-4" isColoured={true} />
+                )}
+              </div>
+              <span className="text-xs font-black uppercase tracking-wider">Sky / Yahoo Mail</span>
+            </div>
+            <span className="text-[10px] bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 px-2 py-0.5 rounded-full font-bold uppercase">Sky / Yahoo</span>
+          </button>
+
+          {/* 5. Apple Mail (iCloud) */}
+          <button
+            onClick={() => setIsICloudModalOpen(true)}
             disabled={connectingProvider !== null}
             className="w-full bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-900/80 dark:hover:bg-zinc-800 text-zinc-900 dark:text-white font-bold py-3 px-4 rounded-[20px] flex items-center justify-between border border-zinc-200 dark:border-zinc-750 shadow-sm transition-all active:scale-[0.98] group disabled:opacity-50 cursor-pointer"
           >
             <div className="flex items-center gap-3">
               <div className="w-7 h-7 bg-white dark:bg-zinc-800 rounded-xl flex items-center justify-center border border-zinc-200 dark:border-zinc-700 transition-colors shadow-xs">
-                <Mail className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <AppleIcon className="w-4 h-4 text-zinc-900 dark:text-white" isColoured={false} />
               </div>
-              <div className="text-left">
-                <span className="text-xs font-black uppercase tracking-wider block">Custom Work Email</span>
-                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-medium block">e.g. bob@tradesperson.co.uk</span>
-              </div>
+              <span className="text-xs font-black uppercase tracking-wider">Apple Mail / iCloud</span>
             </div>
-            <span className="text-[10px] bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 px-2 py-0.5 rounded-full font-bold uppercase">Any Domain</span>
+            <span className="text-[10px] bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 px-2 py-0.5 rounded-full font-bold uppercase">Apple</span>
           </button>
         </div>
 

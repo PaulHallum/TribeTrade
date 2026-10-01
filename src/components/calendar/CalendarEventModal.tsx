@@ -47,7 +47,7 @@ export default function CalendarEventModal({ event, tradeUserId, members, onClos
   const { settings } = useSettings();
   const { showToast } = useToast();
   const { googleAccessToken, refreshGoogleToken, user } = useAuth();
-  const [reminderOffset, setReminderOffset] = useState<ReminderOffset>((event as any)?.reminderOffset || 'at_time');
+  const [reminderOffset, setReminderOffset] = useState<ReminderOffset>((event as any)?.reminderOffset || settings?.defaultReminderOffset || 'at_time');
   const [editingEvent, setEditingEvent] = useState<CalendarEvent>(() => {
     const s = ensureDate(event.startTime);
     const validStart = !isNaN(s.getTime()) ? s.toISOString() : new Date().toISOString();
@@ -185,7 +185,8 @@ export default function CalendarEventModal({ event, tradeUserId, members, onClos
         
         const calculatedReminder = isTimeValid ? calculateReminderTime(startAsDate, reminderOffset) : null;
         const now = new Date();
-        const shouldResetNotified = calculatedReminder ? calculatedReminder > now : false;
+        // Allow reminders due now or within the recent 15-minute window to be queued for notification
+        const shouldResetNotified = calculatedReminder ? calculatedReminder >= new Date(now.getTime() - 15 * 60 * 1000) : false;
 
         await updateDoc(eventRef, {
           title: editingEvent.title,
@@ -351,6 +352,9 @@ export default function CalendarEventModal({ event, tradeUserId, members, onClos
           }
           throw new Error(errorData.error?.message || 'Failed to delete Google event');
         }
+
+        window.dispatchEvent(new CustomEvent('tribe_calendar_event_deleted', { detail: { id: editingEvent.id } }));
+        showToast('Event removed', 'success');
       } else if (editingEvent.type === 'event') {
         const eventRef = doc(db, 'trade_users', tradeUserId, 'calendarEvents', editingEvent.id);
         
@@ -388,7 +392,39 @@ export default function CalendarEventModal({ event, tradeUserId, members, onClos
           }
         }
 
+        // If it's a vehicle compliance event, also clear it from trade_users.vehicles so it doesn't resurrect
+        const vId = (editingEvent as any).vehicleId;
+        const cItemId = (editingEvent as any).complianceItemId;
+        if (vId && cItemId) {
+          try {
+            const userRef = doc(db, 'trade_users', tradeUserId);
+            const userSnap = await getDoc(userRef);
+            if (userSnap.exists()) {
+              const currentVehicles = userSnap.data()?.vehicles || [];
+              const updatedVehicles = currentVehicles.map((v: any) => {
+                if (v.id !== vId) return v;
+                return {
+                  ...v,
+                  complianceItems: (v.complianceItems || []).map((item: any) => 
+                    item.id === cItemId ? { ...item, dueDate: '' } : item
+                  ).filter((item: any) => !(item.type === 'custom' && item.id === cItemId)),
+                  updatedAt: new Date().toISOString()
+                };
+              });
+              await updateDoc(userRef, { vehicles: updatedVehicles });
+              if (user?.uid) {
+                const { syncVehiclesToFirestoreEvents } = await import('../../services/vehicleComplianceService');
+                await syncVehiclesToFirestoreEvents(tradeUserId, updatedVehicles, user.uid);
+              }
+            }
+          } catch (e) {
+            logger.warn('Failed to clear vehicle compliance item dueDate', e);
+          }
+        }
+
         await deleteDoc(eventRef);
+        window.dispatchEvent(new CustomEvent('tribe_calendar_event_deleted', { detail: { id: editingEvent.id } }));
+        showToast('Event removed', 'success');
       }
       onClose();
     } catch (error: any) {

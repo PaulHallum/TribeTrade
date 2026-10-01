@@ -31,6 +31,7 @@ import { useSubscriptionTier } from '../../hooks/useSubscriptionTier';
 import { useToast } from '../../contexts/ToastContext';
 import { downscaleAndCompressImage } from '../../utils/imageUtils';
 import { parseAISODateToLocal } from '../../lib/dateUtils';
+import { calculateReminderTime } from '../../lib/reminderUtils';
 
 interface SmartCaptureModalProps {
   onClose: () => void;
@@ -276,9 +277,15 @@ export default function SmartCaptureModal({
           if (item.data.dueDate) {
             const dueDate = parseAISODateToLocal(item.data.dueDate);
             const isDueDateValid = dueDate !== null && !isNaN(dueDate.getTime());
+            const offset = settings?.defaultReminderOffset || 'at_time';
+            const calcReminder = isDueDateValid ? calculateReminderTime(dueDate, offset) : null;
+            const now = new Date();
+            const shouldReset = calcReminder ? calcReminder >= new Date(now.getTime() - 15 * 60 * 1000) : false;
+
             dataToSave.dueDate = isDueDateValid ? dueDate : null;
-            dataToSave.reminderTime = isDueDateValid ? dueDate : null;
-            dataToSave.notified = false;
+            dataToSave.reminderTime = calcReminder;
+            dataToSave.reminderOffset = offset;
+            dataToSave.notified = !shouldReset;
           }
         } else if (item.action === 'CREATE_CALENDAR_EVENT') {
           dataToSave.title = item.data.title;
@@ -291,10 +298,16 @@ export default function SmartCaptureModal({
             endTime = new Date(startTime.getTime() + 3600000);
           }
 
+          const offset = settings?.defaultReminderOffset || 'at_time';
+          const calcReminder = isStartTimeValid ? calculateReminderTime(startTime, offset) : null;
+          const now = new Date();
+          const shouldReset = calcReminder ? calcReminder >= new Date(now.getTime() - 15 * 60 * 1000) : false;
+
           dataToSave.startTime = isStartTimeValid ? startTime : null;
           dataToSave.endTime = endTime && !isNaN(endTime.getTime()) ? endTime : null;
-          dataToSave.reminderTime = isStartTimeValid ? startTime : null;
-          dataToSave.notified = false;
+          dataToSave.reminderTime = calcReminder;
+          dataToSave.reminderOffset = offset;
+          dataToSave.notified = !shouldReset;
           if (item.data.location) dataToSave.location = item.data.location;
 
           // Auto-generate 7-day advance reminder task for birthdays/anniversaries if enabled

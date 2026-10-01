@@ -81,6 +81,29 @@ export default function Shell() {
   const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
   const [showDashboardTour, setShowDashboardTour] = useState(false);
   const [smartCaptureSampleText, setSmartCaptureSampleText] = useState<string | null>(null);
+  const [showVerificationPrompt, setShowVerificationPrompt] = useState(true);
+  const [showTrialBanner, setShowTrialBanner] = useState(true);
+  const [resendingVerification, setResendingVerification] = useState(false);
+
+  const handleResendVerification = async () => {
+    if (!user) return;
+    setResendingVerification(true);
+    try {
+      const { sendEmailVerification } = await import('firebase/auth');
+      const actionCodeSettings = {
+        url: typeof window !== 'undefined' && window.location.origin
+          ? `${window.location.origin}/?emailVerified=true`
+          : 'https://tribetrader.web.app/?emailVerified=true',
+        handleCodeInApp: true
+      };
+      await sendEmailVerification(user, actionCodeSettings);
+      showToast(`Verification email resent to ${user.email}! Please check your inbox.`, 'success');
+    } catch (err: any) {
+      showToast('Could not resend email. Please try again shortly.', 'error');
+    } finally {
+      setResendingVerification(false);
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -592,9 +615,23 @@ export default function Shell() {
 
         <div className="flex items-center justify-center flex-1 mx-2 sm:mx-4 overflow-hidden gap-2">
           <Weather />
+          {user && isTrial && trialDaysRemaining > 0 && (
+            <button
+              onClick={() => navigateToView('settings', 'billing')}
+              className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 text-[8px] sm:text-[10px] font-black uppercase tracking-wider rounded-full border transition-all shrink-0 hover:scale-105 active:scale-95 shadow-sm h-5 sm:h-6 cursor-pointer ${
+                trialDaysRemaining <= 3
+                  ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30'
+                  : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30'
+              }`}
+              title="Click to view subscription plan in Settings"
+            >
+              <Sparkles className="w-3 h-3 text-amber-500" />
+              <span>Trial: {trialDaysRemaining}d left</span>
+            </button>
+          )}
           {user && !isTrial && subscriptionTier === 'free' && (
             <button
-              onClick={() => navigateToView('settings')}
+              onClick={() => navigateToView('settings', 'billing')}
               className="flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-2.5 py-0 sm:py-0.5 bg-gradient-to-r from-emerald-500/10 to-blue-500/10 hover:from-emerald-500/20 hover:to-blue-500/20 text-emerald-700 dark:text-emerald-400 text-[7px] sm:text-[9px] font-extrabold uppercase tracking-wider rounded-full border border-emerald-500/20 dark:border-emerald-400/10 transition-all shrink-0 hover:scale-105 active:scale-95 shadow-sm h-5 sm:h-6"
               title="Click to Upgrade to Premium"
             >
@@ -703,6 +740,73 @@ export default function Shell() {
             </div>
           )}
 
+          {/* Unverified Email Notification Bar */}
+          {user && !user.emailVerified && user.providerData?.some(p => p.providerId === 'password') && showVerificationPrompt && (
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-4 py-2 flex items-center justify-between text-xs font-semibold shadow-inner shrink-0 z-20">
+              <div className="flex items-center gap-2 min-w-0">
+                <Mail className="w-4 h-4 shrink-0 text-blue-200" />
+                <span className="truncate">
+                  Please verify your email address ({user.email}). Check your inbox for the confirmation link.
+                </span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0 ml-3">
+                <button
+                  onClick={handleResendVerification}
+                  disabled={resendingVerification}
+                  className="px-3 py-1 bg-white text-indigo-900 rounded-lg text-[10px] font-black uppercase tracking-wider hover:bg-blue-50 transition-all shadow-sm active:scale-95 disabled:opacity-50 cursor-pointer"
+                >
+                  {resendingVerification ? 'Sending...' : 'Resend Email'}
+                </button>
+                <button
+                  onClick={() => setShowVerificationPrompt(false)}
+                  className="p-1 hover:bg-white/20 rounded-md transition-all text-white/80 hover:text-white cursor-pointer"
+                  title="Dismiss notification"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
+
+
+          {/* Active 21-Day Trial Notification Bar */}
+          {isTrial && trialDaysRemaining > 0 && showTrialBanner && (
+            <div className={`px-3 sm:px-4 py-2 flex items-center justify-between text-xs font-semibold shrink-0 z-20 shadow-xs border-b ${
+              trialDaysRemaining <= 3
+                ? 'bg-gradient-to-r from-amber-600 via-rose-600 to-red-700 text-white border-amber-700'
+                : 'bg-gradient-to-r from-emerald-700 via-teal-700 to-cyan-800 text-white border-emerald-800'
+            }`}>
+              <div className="flex items-center gap-2 min-w-0">
+                <Sparkles className="w-4 h-4 text-amber-300 shrink-0" />
+                <span className="truncate">
+                  {trialDaysRemaining <= 3 ? (
+                    <span>
+                      <strong className="uppercase tracking-wider">Trial Expiring Soon:</strong> You have <strong>{trialDaysRemaining} {trialDaysRemaining === 1 ? 'day' : 'days'} left</strong> on your 21-day free trial.
+                    </span>
+                  ) : (
+                    <span>
+                      <strong className="uppercase tracking-wider">21-Day Free Trial Active:</strong> <strong>{trialDaysRemaining} days remaining</strong> with full access to quotes, invoicing, and voice briefings.
+                    </span>
+                  )}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0 ml-3">
+                <button
+                  onClick={() => navigateToView('settings', 'billing')}
+                  className="px-2.5 sm:px-3 py-1 bg-white text-zinc-950 rounded-lg text-[10px] font-black uppercase tracking-wider hover:bg-zinc-100 transition-all shadow-sm active:scale-95 cursor-pointer whitespace-nowrap"
+                >
+                  {trialDaysRemaining <= 3 ? 'Subscribe (£7.95/mo)' : 'View Plan'}
+                </button>
+                <button
+                  onClick={() => setShowTrialBanner(false)}
+                  className="p-1 hover:bg-white/20 rounded-md transition-all text-white/80 hover:text-white cursor-pointer"
+                  title="Dismiss notification"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Trial Ended Notification Bar */}
           {trialHasEnded && (
@@ -779,7 +883,7 @@ export default function Shell() {
                 {activeView === 'email' && (
                   <ErrorBoundary name="Email">
                     <Suspense fallback={<div className="flex justify-center p-12"><Loader2 className="w-8 h-8 animate-spin text-emerald-500" /></div>}>
-                      <EmailView />
+                      <EmailView onNavigate={(view, tab) => navigateToView(view as any, tab || null)} />
                     </Suspense>
                   </ErrorBoundary>
                 )}

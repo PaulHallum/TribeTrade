@@ -14,6 +14,7 @@ import {
 import { Invoice, Quote } from '../types/quote';
 import { logger } from './logger';
 import { updateQuoteStatus } from './quoteService';
+import { removeAllocationsForTarget } from './shedService';
 
 /**
  * Subscribes to invoices for a given trade account.
@@ -106,6 +107,13 @@ export async function deleteInvoice(
   tradeUserId: string,
   invoiceId: string
 ): Promise<void> {
+  // Release any allocated stock back to The Shed and remove allocation records
+  try {
+    await removeAllocationsForTarget(tradeUserId, invoiceId, true);
+  } catch (err) {
+    logger.warn('[invoiceService] Failed to clean up shed allocations for invoice:', err);
+  }
+
   const invoiceDoc = doc(db, 'trade_users', tradeUserId, 'invoices', invoiceId);
   await deleteDoc(invoiceDoc);
 }

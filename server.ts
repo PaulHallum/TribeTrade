@@ -1637,10 +1637,10 @@ async function processRemindersLogic() {
             const isEvent = doc.ref.parent.id === 'calendarEvents';
             const view = isEvent ? 'calendar' : 'tasks';
             const deepLink = `/?view=${view}&id=${doc.id}`;
-            const notifTitle = isEvent ? `📅 ${data.title || 'Family Event'}` : `✅ ${data.title || 'Scheduled Task'}`;
+            const notifTitle = isEvent ? `📅 ${data.title || 'Job Booking'}` : `✅ ${data.title || 'Trade Task'}`;
             const notifBody = data.description 
               ? (data.description.length > 90 ? `${data.description.substring(0, 87)}...` : data.description) 
-              : (isEvent ? "Upcoming family event" : "Scheduled family task");
+              : (isEvent ? "Upcoming job booking in diary" : "Scheduled trade task due now");
 
             await messaging.send({
               token: token,
@@ -2211,6 +2211,7 @@ app.post("/api/billing/checkout", async (req, res) => {
         line_items: [{ price: priceId, quantity: 1 }],
         customer_email: email,
         client_reference_id: uid,
+        allow_promotion_codes: true,
         success_url: `${redirectUrl}/?view=settings&payment=success&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${redirectUrl}/?view=settings&payment=cancelled`,
       });

@@ -13,6 +13,7 @@ import {
 } from 'firebase/firestore';
 import { Quote, BusinessDetails, DEFAULT_BUSINESS_DETAILS } from '../types/quote';
 import { logger } from './logger';
+import { removeAllocationsForTarget } from './shedService';
 
 /**
  * Subscribes to quotes for a given trade account.
@@ -209,6 +210,13 @@ export async function deleteQuote(
   tradeUserId: string,
   quoteId: string
 ): Promise<void> {
+  // Release any allocated stock back to The Shed and remove allocation records
+  try {
+    await removeAllocationsForTarget(tradeUserId, quoteId, true);
+  } catch (err) {
+    logger.warn('[quoteService] Failed to clean up shed allocations for quote:', err);
+  }
+
   const quoteDoc = doc(db, 'trade_users', tradeUserId, 'quotes', quoteId);
   await deleteDoc(quoteDoc);
 }

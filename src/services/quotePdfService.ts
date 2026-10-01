@@ -216,7 +216,7 @@ export function buildDocumentPDF(
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8.5);
       doc.setTextColor(24, 24, 27);
-      const qtyLabel = lineItem.unit?.includes('d') || lineItem.unit?.includes('h')
+      const qtyLabel = lineItem.unit && /^\d/.test(lineItem.unit.trim())
         ? lineItem.unit
         : (lineItem.unit ? `${lineItem.quantity} ${lineItem.unit}` : `${lineItem.quantity}`);
       doc.text(qtyLabel, margin + 115, y + 5, { align: 'right' });

@@ -28,6 +28,17 @@ export function useDashboardItems() {
   const [googleEvents, setGoogleEvents] = useState<DashboardItem[]>([]);
   const [members, setMembers] = useState<any[]>([]);
 
+  useEffect(() => {
+    const handleEventDeleted = (e: any) => {
+      const deletedId = e.detail?.id;
+      if (deletedId) {
+        setGoogleEvents(prev => prev.filter(item => item.id !== deletedId));
+      }
+    };
+    window.addEventListener('tribe_calendar_event_deleted', handleEventDeleted);
+    return () => window.removeEventListener('tribe_calendar_event_deleted', handleEventDeleted);
+  }, []);
+
   const isValidDate = (d: any) => d instanceof Date && !isNaN(d.getTime());
 
   const items = useMemo(() => {
@@ -415,7 +426,9 @@ export function useDashboardItems() {
               );
               if (res.ok) {
                 const data = await res.json();
-                return (data.items || []).map((item: any) => {
+                return (data.items || [])
+                  .filter((item: any) => item.status !== 'cancelled')
+                  .map((item: any) => {
                   const startDate = item.start?.dateTime ? new Date(item.start.dateTime) : (item.start?.date ? new Date(item.start.date) : undefined);
                   return {
                     id: `google|${cal.id}|${item.id}`,

@@ -5,9 +5,11 @@ import { auth } from '../../lib/firebase';
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  sendEmailVerification
 } from 'firebase/auth';
 import { useToast } from '../../contexts/ToastContext';
+import { logger } from '../../services/logger';
 
 interface EmailAuthModalProps {
   isOpen: boolean;
@@ -47,7 +49,8 @@ export default function EmailAuthModal({ isOpen, onClose, onSuccess }: EmailAuth
       case 'auth/email-already-in-use':
         return 'An account with this email address already exists. Please sign in instead.';
       case 'auth/weak-password':
-        return 'Your password should be at least 6 characters in length.';
+      case 'auth/password-does-not-meet-requirements':
+        return 'Password must be 6-25 characters and contain at least 1 uppercase letter, 1 number, and 1 special character.';
       case 'auth/too-many-requests':
         return 'Too many unsuccessful attempts. Please wait a moment and try again.';
       case 'auth/network-request-failed':
@@ -56,6 +59,12 @@ export default function EmailAuthModal({ isOpen, onClose, onSuccess }: EmailAuth
         return defaultMsg || 'An unexpected authentication error occurred.';
     }
   };
+
+  const hasMinLength = password.length >= 6 && password.length <= 25;
+  const hasUpperCase = /[A-Z]/.test(password);
+  const hasNumber = /[0-9]/.test(password);
+  const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>_\-+=[\]\\/`~]/.test(password);
+  const isPasswordValid = hasMinLength && hasUpperCase && hasNumber && hasSpecialChar;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,7 +97,23 @@ export default function EmailAuthModal({ isOpen, onClose, onSuccess }: EmailAuth
 
     if (mode === 'signup') {
       if (password.length < 6) {
-        setErrorMessage('Password must be at least 6 characters.');
+        setErrorMessage('Password must be at least 6 characters in length.');
+        return;
+      }
+      if (password.length > 25) {
+        setErrorMessage('Password must be no more than 25 characters in length.');
+        return;
+      }
+      if (!hasUpperCase) {
+        setErrorMessage('Password must contain at least 1 uppercase letter (A-Z).');
+        return;
+      }
+      if (!hasNumber) {
+        setErrorMessage('Password must contain at least 1 numeric character (0-9).');
+        return;
+      }
+      if (!hasSpecialChar) {
+        setErrorMessage('Password must contain at least 1 special character (e.g. !@#$%^&*).');
         return;
       }
       if (password !== confirmPassword) {
@@ -103,8 +128,20 @@ export default function EmailAuthModal({ isOpen, onClose, onSuccess }: EmailAuth
         await signInWithEmailAndPassword(auth, cleanEmail, password);
         showToast('Signed in successfully!', 'success');
       } else {
-        await createUserWithEmailAndPassword(auth, cleanEmail, password);
-        showToast('Account created successfully!', 'success');
+        const userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
+        try {
+          const actionCodeSettings = {
+            url: typeof window !== 'undefined' && window.location.origin
+              ? `${window.location.origin}/?emailVerified=true`
+              : 'https://tribetrader.web.app/?emailVerified=true',
+            handleCodeInApp: true
+          };
+          await sendEmailVerification(userCredential.user, actionCodeSettings);
+          showToast('Account created! A verification link has been sent to your email.', 'success');
+        } catch (verErr) {
+          logger.warn('Failed to dispatch email verification', verErr);
+          showToast('Account created successfully!', 'success');
+        }
       }
       if (onSuccess) onSuccess();
       onClose();
@@ -254,6 +291,73 @@ export default function EmailAuthModal({ isOpen, onClose, onSuccess }: EmailAuth
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
+
+                {/* Password Criteria Checklist (Required by security policy) */}
+                {mode === 'signup' && (
+                  <div className="mt-2.5 p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-200/80 dark:border-zinc-700/60 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                        Password Requirements
+                      </span>
+                      <span className={`text-[10px] font-bold ${isPasswordValid ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-400'}`}>
+                        {isPasswordValid ? 'Strong Password ✓' : 'Requirements'}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[11px]">
+                      <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border transition-all ${
+                        hasMinLength 
+                          ? 'text-emerald-700 dark:text-emerald-300 bg-emerald-50/80 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800/50 font-semibold'
+                          : 'text-zinc-500 dark:text-zinc-400 bg-white dark:bg-zinc-800/80 border-zinc-200/80 dark:border-zinc-700'
+                      }`}>
+                        {hasMinLength ? (
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        ) : (
+                          <div className="w-1.5 h-1.5 rounded-full bg-zinc-400 shrink-0 mx-1" />
+                        )}
+                        <span>6 to 25 characters</span>
+                      </div>
+
+                      <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border transition-all ${
+                        hasUpperCase 
+                          ? 'text-emerald-700 dark:text-emerald-300 bg-emerald-50/80 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800/50 font-semibold'
+                          : 'text-zinc-500 dark:text-zinc-400 bg-white dark:bg-zinc-800/80 border-zinc-200/80 dark:border-zinc-700'
+                      }`}>
+                        {hasUpperCase ? (
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        ) : (
+                          <div className="w-1.5 h-1.5 rounded-full bg-zinc-400 shrink-0 mx-1" />
+                        )}
+                        <span>1 uppercase letter (A-Z)</span>
+                      </div>
+
+                      <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border transition-all ${
+                        hasNumber 
+                          ? 'text-emerald-700 dark:text-emerald-300 bg-emerald-50/80 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800/50 font-semibold'
+                          : 'text-zinc-500 dark:text-zinc-400 bg-white dark:bg-zinc-800/80 border-zinc-200/80 dark:border-zinc-700'
+                      }`}>
+                        {hasNumber ? (
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        ) : (
+                          <div className="w-1.5 h-1.5 rounded-full bg-zinc-400 shrink-0 mx-1" />
+                        )}
+                        <span>1 number (0-9)</span>
+                      </div>
+
+                      <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border transition-all ${
+                        hasSpecialChar 
+                          ? 'text-emerald-700 dark:text-emerald-300 bg-emerald-50/80 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800/50 font-semibold'
+                          : 'text-zinc-500 dark:text-zinc-400 bg-white dark:bg-zinc-800/80 border-zinc-200/80 dark:border-zinc-700'
+                      }`}>
+                        {hasSpecialChar ? (
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        ) : (
+                          <div className="w-1.5 h-1.5 rounded-full bg-zinc-400 shrink-0 mx-1" />
+                        )}
+                        <span>1 special symbol (!@#$)</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

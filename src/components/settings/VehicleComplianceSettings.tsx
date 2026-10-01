@@ -19,7 +19,7 @@ import { parseISO, isValid, format, differenceInDays } from 'date-fns';
 import { Vehicle, VehicleComplianceItem, createDefaultComplianceItems, VehicleType } from '../../types/vehicle';
 import { advanceComplianceDueDate, syncVehiclesToFirestoreEvents } from '../../services/vehicleComplianceService';
 import { useToast } from '../../contexts/ToastContext';
-import { doc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import ConfirmModal from '../common/ConfirmModal';
 import MileageLogModal from '../expenses/MileageLogModal';
@@ -163,10 +163,35 @@ export default function VehicleComplianceSettings({
     );
   };
 
-  const handleDeleteVehicle = (vehicleId: string) => {
-    setVehicles(prev => prev.filter(v => v.id !== vehicleId));
+  const handleDeleteVehicle = async (vehicleId: string) => {
+    const updated = vehicles.filter(v => v.id !== vehicleId);
+    setVehicles(updated);
     setDeleteConfirm({ isOpen: false, vehicleId: '', vehicleName: '' });
-    showToast('Vehicle removed. Click Save to apply.', 'info');
+
+    try {
+      // 1. Immediately persist updated vehicles array to Firestore
+      await setDoc(doc(db, 'trade_users', tradeUserId), {
+        vehicles: updated
+      }, { merge: true });
+
+      // 2. Query and delete all calendarEvents in Firestore linked to this vehicle
+      const eventsRef = collection(db, 'trade_users', tradeUserId, 'calendarEvents');
+      const q = query(eventsRef, where('vehicleId', '==', vehicleId));
+      const snap = await getDocs(q);
+      const batch = writeBatch(db);
+      snap.docs.forEach(d => batch.delete(d.ref));
+      await batch.commit();
+
+      // 3. Re-sync remaining vehicle events
+      await syncVehiclesToFirestoreEvents(tradeUserId, updated, userId);
+
+      // 4. Dispatch event so Hub and Calendar immediately update
+      window.dispatchEvent(new CustomEvent('tribe_calendar_event_deleted'));
+
+      showToast('Vehicle and related calendar entries deleted.', 'success');
+    } catch (err: any) {
+      showToast('Failed to delete vehicle: ' + err.message, 'error');
+    }
   };
 
   const handleSaveAll = async () => {
@@ -463,16 +488,19 @@ export default function VehicleComplianceSettings({
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
                           <span className="text-[10px] font-black uppercase tracking-wider text-zinc-500">
-                            Compliance Dates & Annual Cycles
+                            Compliance Dates (Auto-Generates Yearly)
                           </span>
                           <button
                             type="button"
                             onClick={() => handleAddCustomItem(vehicle.id)}
-                            className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 flex items-center gap-1"
+                            className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 flex items-center gap-1 cursor-pointer"
                           >
                             <Plus className="w-3 h-3" /> Add Custom Check (e.g. LOLER)
                           </button>
                         </div>
+                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                          MOT, Servicing, and Insurance automatically recur every year on your calendar with 1-month advance reminders. Simply set the upcoming due date.
+                        </p>
 
                         <div className="grid grid-cols-1 gap-2.5">
                           {vehicle.complianceItems.map(item => {
@@ -518,22 +546,20 @@ export default function VehicleComplianceSettings({
                                     />
                                   </div>
 
-                                  <div className="flex items-center gap-1 self-end sm:self-center pt-2 sm:pt-4">
-                                    <button
-                                      type="button"
-                                      onClick={() => handleAdvanceYear(vehicle.id, item.id, item.dueDate)}
-                                      title="Renew for next year (+1 Year)"
-                                      className="px-2.5 py-1.5 bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-700 dark:hover:bg-zinc-600 text-zinc-700 dark:text-zinc-200 text-[10px] font-black rounded-lg transition-colors flex items-center gap-1"
+                                  <div className="flex items-center gap-1.5 self-end sm:self-center pt-2 sm:pt-4">
+                                    <span 
+                                      className="px-2 py-1 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/40 text-[10px] font-bold rounded-lg flex items-center gap-1"
+                                      title="Automatically recurs yearly on this date"
                                     >
-                                      <RefreshCw className="w-3 h-3" />
-                                      <span>+1 Yr</span>
-                                    </button>
+                                      <RefreshCw className="w-3 h-3 text-emerald-500" />
+                                      <span>Yearly</span>
+                                    </span>
 
                                     {item.type === 'custom' && (
                                       <button
                                         type="button"
                                         onClick={() => handleRemoveItem(vehicle.id, item.id)}
-                                        className="p-1.5 text-zinc-400 hover:text-rose-500 transition-colors rounded-lg"
+                                        className="p-1.5 text-zinc-400 hover:text-rose-500 transition-colors rounded-lg cursor-pointer"
                                         title="Remove check"
                                       >
                                         <Trash2 className="w-3.5 h-3.5" />

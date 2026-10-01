@@ -87,6 +87,11 @@ export function useSubscriptionTier(): SubscriptionStatus {
           const raw = bData.trialEndsAt;
           currentTEnds = typeof raw.toDate === 'function' ? raw.toDate() : new Date(raw);
           setTrialEndsAt(currentTEnds);
+        } else if (bData.createdAt) {
+          const raw = bData.createdAt;
+          const cDate = typeof raw.toDate === 'function' ? raw.toDate() : new Date(raw);
+          currentTEnds = new Date(cDate.getTime() + 21 * 24 * 60 * 60 * 1000);
+          setTrialEndsAt(currentTEnds);
         }
       }
       evalTier(currentUserTier, currentFamTier, currentBillingTier, currentBeta, currentTEnds);
@@ -96,6 +101,22 @@ export function useSubscriptionTier(): SubscriptionStatus {
       if (snap.exists()) {
         const userData = snap.data();
         currentUserTier = userData.subscriptionTier || 'free';
+        if (!currentTEnds) {
+          if (userData.trialEndsAt) {
+            const raw = userData.trialEndsAt;
+            currentTEnds = typeof raw.toDate === 'function' ? raw.toDate() : new Date(raw);
+            setTrialEndsAt(currentTEnds);
+          } else if (userData.createdAt) {
+            const raw = userData.createdAt;
+            const cDate = typeof raw.toDate === 'function' ? raw.toDate() : new Date(raw);
+            currentTEnds = new Date(cDate.getTime() + 21 * 24 * 60 * 60 * 1000);
+            setTrialEndsAt(currentTEnds);
+          } else if (user.metadata?.creationTime) {
+            const cDate = new Date(user.metadata.creationTime);
+            currentTEnds = new Date(cDate.getTime() + 21 * 24 * 60 * 60 * 1000);
+            setTrialEndsAt(currentTEnds);
+          }
+        }
         const fid = userData.tradeUserId || `trade_${user.uid}`;
         
         if (fid) {
@@ -104,6 +125,18 @@ export function useSubscriptionTier(): SubscriptionStatus {
             if (famSnap.exists()) {
               const fData = famSnap.data();
               currentFamTier = fData.subscriptionTier || 'free';
+              if (!currentTEnds) {
+                if (fData.trialEndsAt) {
+                  const raw = fData.trialEndsAt;
+                  currentTEnds = typeof raw.toDate === 'function' ? raw.toDate() : new Date(raw);
+                  setTrialEndsAt(currentTEnds);
+                } else if (fData.createdAt) {
+                  const raw = fData.createdAt;
+                  const cDate = typeof raw.toDate === 'function' ? raw.toDate() : new Date(raw);
+                  currentTEnds = new Date(cDate.getTime() + 21 * 24 * 60 * 60 * 1000);
+                  setTrialEndsAt(currentTEnds);
+                }
+              }
               setCancelAtPeriodEnd(Boolean(fData.cancelAtPeriodEnd));
               if (fData.currentPeriodEnd) {
                 const rawEnd = fData.currentPeriodEnd;

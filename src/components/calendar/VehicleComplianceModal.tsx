@@ -10,11 +10,12 @@ import {
   RefreshCw, 
   Loader2, 
   FileText, 
-  ExternalLink 
+  ExternalLink,
+  Trash2
 } from 'lucide-react';
 import { format, parseISO, isValid, differenceInDays } from 'date-fns';
 import { useToast } from '../../contexts/ToastContext';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { advanceComplianceDueDate, syncVehiclesToFirestoreEvents } from '../../services/vehicleComplianceService';
 import { Vehicle } from '../../types/vehicle';
@@ -36,6 +37,7 @@ export default function VehicleComplianceModal({
 }: VehicleComplianceModalProps) {
   const { showToast } = useToast();
   const [renewing, setRenewing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const vehicleId = event.vehicleId;
   const complianceItemId = event.complianceItemId;
@@ -96,6 +98,53 @@ export default function VehicleComplianceModal({
       showToast('Failed to renew compliance record: ' + err.message, 'error');
     } finally {
       setRenewing(false);
+    }
+  };
+
+  const handleDeleteComplianceEntry = async () => {
+    if (!tradeUserId || !vehicleId) {
+      showToast('Unable to identify vehicle record.', 'error');
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      const userRef = doc(db, 'trade_users', tradeUserId);
+      const snap = await getDoc(userRef);
+
+      if (snap.exists()) {
+        const currentVehicles: Vehicle[] = snap.data()?.vehicles || [];
+        const updatedVehicles = currentVehicles.map(v => {
+          if (v.id !== vehicleId) return v;
+          const updatedItems = v.complianceItems.map(item => {
+            if (item.id === complianceItemId) {
+              return { ...item, dueDate: '' };
+            }
+            return item;
+          }).filter(item => !(item.type === 'custom' && item.id === complianceItemId));
+          return { ...v, complianceItems: updatedItems, updatedAt: new Date().toISOString() };
+        });
+
+        await updateDoc(userRef, { vehicles: updatedVehicles });
+
+        if (userId) {
+          await syncVehiclesToFirestoreEvents(tradeUserId, updatedVehicles, userId);
+        }
+      }
+
+      if (event.id) {
+        try {
+          await deleteDoc(doc(db, 'trade_users', tradeUserId, 'calendarEvents', event.id));
+        } catch (e) {}
+      }
+
+      window.dispatchEvent(new CustomEvent('tribe_calendar_event_deleted', { detail: { id: event.id } }));
+      showToast('Vehicle compliance entry removed from calendar.', 'success');
+      onClose();
+    } catch (err: any) {
+      showToast('Failed to remove entry: ' + err.message, 'error');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -218,34 +267,33 @@ export default function VehicleComplianceModal({
 
         {/* Footer actions */}
         <div className="p-4 bg-zinc-50 dark:bg-zinc-800/40 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between gap-2">
-          {onNavigateToSettings ? (
-            <button
-              onClick={() => {
-                onClose();
-                onNavigateToSettings();
-              }}
-              className="text-xs font-bold text-zinc-600 dark:text-zinc-300 hover:text-emerald-600 dark:hover:text-emerald-400 flex items-center gap-1 px-3 py-2 rounded-xl transition-colors"
-            >
-              <span>Manage in Settings</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </button>
-          ) : (
-            <div />
-          )}
+          <button
+            onClick={handleDeleteComplianceEntry}
+            disabled={deleting}
+            className="text-xs font-bold text-rose-600 hover:text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 flex items-center gap-1.5 px-3 py-2 rounded-xl transition-colors disabled:opacity-50 cursor-pointer"
+            title="Delete this reminder from calendar"
+          >
+            {deleting ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+            )}
+            <span>Delete Entry</span>
+          </button>
 
           <div className="flex items-center gap-2">
-            <button
-              onClick={handleRenewOneYear}
-              disabled={renewing}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-sm disabled:opacity-50"
-            >
-              {renewing ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <RefreshCw className="w-3.5 h-3.5" />
-              )}
-              <span>Renew for Next Year (+1 Yr)</span>
-            </button>
+            {onNavigateToSettings && (
+              <button
+                onClick={() => {
+                  onClose();
+                  onNavigateToSettings();
+                }}
+                className="text-xs font-bold text-zinc-600 dark:text-zinc-300 hover:text-emerald-600 dark:hover:text-emerald-400 flex items-center gap-1 px-3 py-2 rounded-xl transition-colors cursor-pointer"
+              >
+                <span>Manage in Settings</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
         </div>
       </motion.div>

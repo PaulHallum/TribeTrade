@@ -80,8 +80,11 @@ Positioned immediately next to **Quotes** in the navigation bar, **Expenses** ma
 
 - **Shed Inventory (`shedInventory`)** — Centralised inventory tracking for tools, power equipment, test instruments, and consumables stored in vans or lockups.
 - **Stock Tracking & Minimum Levels** — Monitors quantities, locations (Van 1, Lockup, Workshop), serial numbers, and calibration expiry dates.
-- **Job Allocations & Reserved Stock (`shedService`)** — Held stock items can be allocated and reserved directly to active Trade Invoices or custom direct jobs. Stock cards display visual `[x] reserved` indicator badges.
-- **Reserved Stock by Job Section** — Dedicated live-updating section at the bottom of The Shed grouped by invoice/job reference, detailing item quantities, prices, and one-tap return-to-shed actions.
+- **Job Allocations & Reserved Stock (`shedService`)** — Held stock items can be allocated and reserved directly to active Trade Invoices, Quotes, or custom direct jobs. Stock cards display visual `[x] reserved` indicator badges.
+- **Reserved Stock by Job Section** — Dedicated live-updating section at the bottom of The Shed grouped by invoice/job reference, detailing item quantities, prices, job dates, and one-tap return-to-shed actions.
+- **Unreserving Stock (`unreserveStockAllocation`, `unreserveJobAllocations`)** — Tradespeople can return reserved stock back into The Shed at any time with a single tap. Returning stock restores the item quantity in `shedInventory` (recreating the inventory record if it reached zero), removes the material charge from the linked invoice or quote, and deletes the allocation record. An "Unreserve All" action is also provided per job.
+- **Cascade Deletion on Invoices & Quotes (`removeAllocationsForTarget`)** — When an invoice or quote is deleted, any stock allocated to that job is automatically returned to The Shed inventory and the allocation records are purged, ensuring reserved stock never becomes orphaned or permanently deducted.
+- **Passed & Completed Job Filtering** — Allocations linked to completed or paid invoices, declined quotes, or jobs whose scheduled date has passed are automatically excluded from the active "Reserved & Allocated Stock by Job" view and deducted from reserved counts. Tradespeople can toggle the **Past Jobs** button to inspect historical allocations, or tap **Job Done** on an active card to clear materials from reserved stock upon job completion.
 - **Job Cross-Referencing** — When quotes are converted to jobs, TribeTrade automatically checks The Shed to highlight in-stock materials and flag missing supplies.
 
 ### 1.7 Materials Pick Lists & Merchant Ordering
@@ -120,15 +123,18 @@ Positioned immediately next to **Quotes** in the navigation bar, **Expenses** ma
 - **Display & Trade Themes** — Clean display mode toggle (Light Mode / Dark Mode) and 9 trade accent themes (Electrician Amber, Plumber Sky Blue, Builder Slate, Carpenter Emerald, Heating Rose, etc.).
 - **Work Tablet PIN Lock** — Optional 4-digit PIN-protected security gate for shared site tablets and van devices (stored as a secure hash).
 - **Notification Preferences** — Push notification toggle for job reminders and compliance dates.
-- **Subscription & Billing Command Center** — Prominent, enlarged hero card under Account & Subscription with live plan badges (Active, Trial, Past Due), clear renewal date display, instant sync, and 1-click access to the Stripe Customer Portal for managing direct debits, cards, and VAT receipts.
+- **Subscription & Billing Command Center** — Prominent, enlarged hero card under Account & Subscription with live plan badges (Active, Trial, Past Due), clear renewal date display, instant sync, and 1-click access to the Stripe Customer Portal for managing direct debits, cards, and VAT receipts. An active top notification banner and header badge inform users of remaining trial days and warn when the 21-day trial is nearing expiry.
+- **Enhanced Password Policy & Security** — Firebase Auth enforces strong password complexity during registration (6-25 characters, minimum 1 uppercase letter, 1 number, and 1 special symbol) with a real-time visual checklist in `EmailAuthModal.tsx`.
+- **In-App Action Code Verification** — Automatic client-side email verification handler (`AuthActionHandler`) processes action codes in-app, protecting users from email scanner pre-fetch link expirations and instantly refreshing user verification state.
 - **Resilient Firestore Serialization** — Configured with `ignoreUndefinedProperties: true` and payload sanitization across all services (quotes, invoices, mileage, and inventory) to prevent runtime serialization failures when saving optional fields.
-- **Connected Accounts & Resilient Cloud Sync** — Synchronise Gmail, Outlook, Yahoo, and Apple Mail inboxes. Supports Google App Passwords with a direct-to-Firestore cloud registration fallback (`trade_users/{tradeUserId}/connectedAccounts`) ensuring immediate, reliable connection across mobile PWAs and static hosting environments.
+- **Connected Accounts & Mailbox Intelligence** — Synchronise Gmail, Outlook, Yahoo, and Apple Mail inboxes. Supports Google App Passwords with a direct-to-Firestore cloud registration fallback (`trade_users/{tradeUserId}/connectedAccounts`). Clarifies identity vs mailbox authorization (signing in does not read personal emails without consent), provides step-by-step setup guides, 1-tap Smart Convert quote extraction, diary visit booking, automated materials extraction to The Shed, and sample enquiry testing.
 
 ### 1.11 Push Notifications & Job Reminders
 
 - **FCM (Firebase Cloud Messaging)** push notifications for tasks and calendar job reminders.
-- **Customizable Reminder Lead Times**: Events and tasks support user-selectable reminder timing (*At time of event/due time*, *10 minutes before*, *30 minutes before*, *1 hour before*, *1 day before at 09:00*, or *No reminder*), with business default preferences in Settings.
+- **Customizable Reminder Lead Times**: Events and tasks trigger at the exact scheduled due time by default (*At time of event / At due time*), or in advance if configured in **Settings > Default Reminder Timing** (*10 minutes before*, *30 minutes before*, *1 hour before*, *1 day before at 09:00*, or *No reminder*), with per-item overrides available in event and task modals.
 - **Google Calendar Synchronisation Overrides**: Explicitly sets `reminders: { useDefault: false, overrides: [...] }` when syncing to Google Calendar, preventing Google's account-level default alerts from firing unwanted duplicate or early notifications.
+- **Google Calendar Deletion & Tombstone Resilience**: Gracefully handles Google Calendar `410 Gone` and `404 Not Found` API responses when deleting already-removed events, dispatches immediate in-memory prune events (`tribe_calendar_event_deleted`) across the Hub and Calendar, and filters out `status: 'cancelled'` entries from Google Calendar fetch responses.
 - **Safe Daytime All-Day Scheduling**: All-day job entries and compliance deadlines default to 09:00 AM local time rather than midnight UTC.
 - **Backend Ticker & Freshness Window**: The backend runs a **cron job every minute** that queries Firestore for items with `notified: false` and `reminderTime <= now` within a 2-hour freshness window (`reminderTime >= now - 2 hours`), ensuring ancient overdue tasks never fire notifications when edited or re-registered. Completed tasks are automatically excluded and marked `notified: true` to prevent late reminders.
 - **Consistent Firestore Timestamps**: `reminderTime` is strictly stored as a Firestore Timestamp across all modals.
@@ -143,8 +149,8 @@ Positioned immediately next to **Quotes** in the navigation bar, **Expenses** ma
   - **Embedded Interactive Trade Sandbox Tour** — Integrates a live 5-step interactive simulation directly into the page flow (`DashboardTour.tsx` with `isEmbedded={true}`) enabling visitors to test:
     1. **Trade Hub Overview:** Live Apex Electrical greeting, weather, trade briefing badge, site noticeboard, 3 booked jobs, quotes & billing pipeline, and van MOT/tax status.
     2. **AI Smart Capture & Quote Drafting:** Instant parsing of an enquiry into labour, materials, VAT, CIS, total £1,152.00, and a calendar booking.
-    3. **Magic Mic & Audio Briefing:** Van stock dictation to The Shed, site survey scheduling, and a hands-free audio briefing player.
-    4. **Quotes, Invoicing & 1-Click Payments:** Itemised quote card #Q-1042, deposit tracking, 1-click invoice conversion #INV-2090, and CIS deductions.
+    3. **Magic Mic & Audio Briefing:** Van stock dictation to The Shed ("Ask Tribe..."), site survey scheduling, and a hands-free audio briefing player.
+    4. **Quotes & Invoicing:** Itemised quote card #Q-1042, deposit tracking, 1-click invoice conversion #INV-2090, and CIS deductions.
     5. **Expenses, Receipt OCR & HMRC MTD Tax Prep:** Screwfix till slip OCR, £23.80 VAT extraction, HMRC Self-Assessment tax pot calculator, and MTD CSV download.
   - **Integrated Feature Matrix & Pricing Section** — Side-by-side Free Tier (£0) vs Premium (£7.95/month or £79.00/year with a 21-day free trial).
   - **Progressive Web App (PWA) Multi-Device Guide** — 1-tap installation guide for iPhone/iPad (Safari Add to Home Screen), Android (Chrome 1-tap install), and Desktop (Mac/Windows windowed app).
@@ -360,6 +366,7 @@ To prevent `failed-precondition` transaction errors when checking subscription s
 | `getTribeAudioCached` | Callable (HTTPS) | Daily briefing TTS with Firebase Storage caching |
 | `onDeleteUser` | Auth trigger (user deletion) | GDPR-compliant data wipe — deletes all user data, family data (if sole member), and subcollections |
 | `onSupportTicketCreated` | Firestore trigger (`support_tickets/{ticketId}`) | Creates a private task on the admin dashboard and sends push notification |
+| `processDueReminders` | Scheduled (`every 1 minutes`, London time) | Background ticker checking tasks and calendar events due for reminder, dispatching push notifications via FCM |
 
 **Runtime:** Node.js 22, region `europe-west2`, max 10 instances.
 
@@ -431,12 +438,17 @@ support_tickets/{ticketId}        — User-submitted support tickets
 
 ### 4.6 Authentication Flow
 
-1. User clicks "Sign In" → Firebase Auth `signInWithPopup` (Google provider).
-2. After Firebase Auth, a **separate OAuth popup** requests the Google Calendar scope via the backend's `/api/auth/url` endpoint.
-3. The OAuth callback (`/auth/callback`) exchanges the authorisation code for tokens and posts them back to the opener window via `postMessage`.
-4. Tokens are stored in `localStorage` with automatic expiry tracking.
-5. **Silent refresh** — A proactive timer schedules token refresh 5 minutes before expiry via the `/api/auth/refresh` endpoint.
-6. If the refresh token is unavailable and the user was previously connected, a re-authentication prompt is shown.
+1. **Email & Password Sign-Up / Sign-In (Default & Any Domain):**
+   - Tradespeople can register and sign in with any custom or generic email address (e.g. `bob@bobstrades.co.uk`) and password via Firebase Authentication (`createUserWithEmailAndPassword`, `signInWithEmailAndPassword`).
+   - Upon registration, Firebase automatically dispatches a verification link (`sendEmailVerification`) to the user's inbox.
+   - An unverified banner is displayed in the application shell with a 1-click **Resend Email** action if the tradesperson has not yet confirmed their email address.
+   - Password reset links are dispatched directly to the user's inbox via `sendPasswordResetEmail`.
+2. **1-Click Identity Providers:**
+   - Users can optionally sign in with Google Workspace / Gmail, Microsoft 365 / Outlook, Sky / Yahoo Mail, or Apple Mail (iCloud).
+3. **Decoupled Built-in Calendar & Optional Google Calendar Sync:**
+   - TribeTrade's Job Diary and appointment system is 100% native and operates independently in Firestore (`trade_users/{tradeUserId}/calendarEvents`) with zero external Google account dependencies.
+   - If the tradesperson wishes to mirror appointments with their personal Google Calendar, they can connect Google Calendar optionally in **Settings > Integrations**.
+   - If connected, tokens are stored in `localStorage` with automatic expiry tracking and silent refresh via `/api/auth/refresh`. If tokens expire and need renewal, an inline reconnect prompt is provided.
 
 ### 4.7 External APIs
 
@@ -474,7 +486,7 @@ support_tickets/{ticketId}        — User-submitted support tickets
 - **Status Workflow:** Quotes support `draft`, `sent`, `pending`, `accepted`, and `declined`. Invoices support `draft`, `sent`, `paid`, and `overdue`.
 - **Quote-to-Invoice Conversion & Reversion:** Converted quotes disappear from active quotes by default (accessible via "Converted to Invoice" tab). Converted invoices can be reverted back to active quotations (`revertInvoiceToQuote`), safely restoring the quote and voiding the invoice.
 - **Accounting Export:** "Export Invoices (CSV)" provides full financial summary downloads formatted for Xero and accountant reconciliation.
-- **Statutory Financial & HMRC Compliance Notices:** Unobtrusive footer disclaimers on financial views (Quotes & Invoices and Expenses & Bookkeeping, alongside Self Assessment and Editors) affirming that TribeTrade is an AI trade assistant and productivity tool, not a certified accountant or registered tax adviser (with all figures verified before HMRC submission), paired with UK statutory record-keeping requirements (TMA 1970 s12B) on Expenses to retain original receipts for 5–6 years.
+- **Statutory Financial & HMRC Compliance Notices:** Unobtrusive footer disclaimers on financial views (Quotes & Invoices, Expenses & Bookkeeping, and Van Mileage, alongside Self Assessment and Editors) affirming that TribeTrade is an AI trade assistant and productivity tool, not a certified accountant or registered tax adviser (with all figures verified before HMRC submission), paired with UK statutory record-keeping requirements (TMA 1970 s12B) on Expenses and Van Mileage to retain original receipts and journey logs for 5–6 years.
 - **Trade Scribble OCR Intelligence:** Multimodal AI extracts handwritten paper notes, trade scribbles, and merchant receipts, accurately classifying them as Quotes (`CREATE_QUOTE`), The Shed materials shopping lists (`CREATE_SHOPPING_ITEM`), Calendar appointments (`CREATE_CALENDAR_EVENT`), or Tasks (`CREATE_TASK`).
 
 ### 4.10 The Shed Inventory & Job Allocation System
@@ -491,12 +503,18 @@ support_tickets/{ticketId}        — User-submitted support tickets
 - **Component:** `NavigationDrawer.tsx` integrated directly into `Shell.tsx`.
 - **Elimination of Horizontal Sub-Menu:** The horizontal sub-navigation bar has been completely removed across all screen sizes (mobile, tablet, and desktop), eliminating horizontal scrolling and discoverability drop-off while maximising vertical screen space for Hub cards, live quotes, and the morning briefing.
 - **Top Bar Burger Toggle:** A themed, high-visibility button in the top navigation bar featuring a dynamic light-beam shimmer animation (matching the Morning Briefing button aesthetics). It automatically adapts its background tint, border, ambient glow, burger bars, and active state to the user's selected app theme colour (e.g. Mercedes, Ferrari, McLaren, Aston Martin, Williams), morphing seamlessly into an 'X' close toggle with a responsive label ('Menu' / 'Close') when the drawer is open.
-  - **Account & Tier Badge:** Displays the authenticated email address alongside active plan status (*Premium*, *Trial days remaining*, or *Free Tier*).
+  - **Account & Tier Badge:** Displays the authenticated email address alongside active plan status (*Trial days remaining*, *Premium*, or *Free Tier*), acting as an interactive quick shortcut to manage subscriptions under Settings.
   - **Core Navigation:** Grouped access to **Hub (Home)** and **Calendar**.
-  - **Business Workflow:** Grouped access to **Quotes & Invoices**, **Expenses**, **Tasks**, **Supplies (The Shed)**, **Email**, and **Support**.
+  - **Business Workflow:** Grouped access to **Quotes & Invoices**, **Expenses & Mileage**, **Tasks**, **Supplies (The Shed)**, **Email**, and **Support**.
   - **System & Preferences:** Quick jumps to **Settings & Sync** and the **User Guide**.
   - **1-Tap Sign Out:** Clean logout button at the drawer base.
   - **Backdrop & Dismissal:** Closes automatically on item selection, clicking outside the drawer, or pressing the `Escape` key.
+
+### 4.12 Vehicle Fleet Compliance & Calendar Lifecycle
+
+- **Multi-Year Automated Recurrence:** MOT, Servicing, and Insurance entries automatically project across 3 calendar years with 1-month advance reminders without requiring manual year renewal clicks.
+- **Immediate Deletion & Purging:** Deleting a vehicle in **Settings > Vehicle & Transport Fleet Compliance** immediately updates Firestore and purges all corresponding vehicle compliance calendar events from both the Calendar and the Hub in real time.
+- **Hub & Calendar Deletion:** Tapping a vehicle compliance event from the Hub or Calendar launches `VehicleComplianceModal` equipped with a **Delete Entry** action to clear the reminder from the schedule and vehicle record.
 
 ---
 

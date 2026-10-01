@@ -277,7 +277,9 @@ export default function InvoicePreviewModal({
                       {item.type}
                     </td>
                     <td className="p-3 text-right text-zinc-700 dark:text-zinc-300">
-                      {item.quantity} {item.unit || ''}
+                      {item.unit && /^\d/.test(item.unit.trim())
+                        ? item.unit
+                        : (item.unit ? `${item.quantity} ${item.unit}` : item.quantity)}
                     </td>
                     <td className="p-3 text-right text-zinc-700 dark:text-zinc-300">
                       {formatCurrency(item.unitPrice)}

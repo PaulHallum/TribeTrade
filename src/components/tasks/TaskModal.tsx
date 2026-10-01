@@ -72,7 +72,7 @@ export default function TaskModal({ task, members, categories, onClose, onSave, 
   const [validationError, setValidationError] = useState<string | null>(null);
   const [dueDate, setDueDate] = useState(formatToLocalDate(task?.dueDate));
   const [dueTime, setDueTime] = useState(formatToLocalTime(task?.dueDate));
-  const [reminderOffset, setReminderOffset] = useState<ReminderOffset>((task as any)?.reminderOffset || 'at_time');
+  const [reminderOffset, setReminderOffset] = useState<ReminderOffset>((task as any)?.reminderOffset || settings?.defaultReminderOffset || 'at_time');
   const [subtasks, setSubtasks] = useState<Subtask[]>(task?.subtasks || []);
   const [newSubtask, setNewSubtask] = useState('');
   const [showSmartConvert, setShowSmartConvert] = useState(false);
@@ -91,7 +91,8 @@ export default function TaskModal({ task, members, categories, onClose, onSave, 
     const taskDueDate = !noSchedule && dueDate ? combineDateTimeToDate(dueDate, dueTime) : null;
     const calculatedReminder = taskDueDate ? calculateReminderTime(taskDueDate, reminderOffset) : null;
     const now = new Date();
-    const shouldResetNotified = calculatedReminder ? calculatedReminder > now : false;
+    // Allow reminders due now or within the recent 15-minute window to be queued for notification
+    const shouldResetNotified = calculatedReminder ? calculatedReminder >= new Date(now.getTime() - 15 * 60 * 1000) : false;
 
     const taskData: Partial<Task> = {
       title: title.trim(),
