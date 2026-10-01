@@ -305,9 +305,9 @@ Daily usage is tracked per family in `families/{familyId}/usage/{YYYY-MM-DD}` wi
 - `smartCaptureRuns` — Smart Capture executions
 - `smartConvertRuns` — Smart Convert executions
 
-Each counter is incremented atomically via Firestore transactions (`usageService.ts`) and checked against tier-specific limits before allowing the AI call to proceed. 
+Each counter is incremented atomically using Firestore's `increment()` field value (`usageService.ts`) and verified against tier-specific limits with `getDoc` before allowing the AI or smart feature to proceed. 
 
-To prevent `failed-precondition` transaction errors when checking subscription status for accounts without a `private/billing` subcollection document, private billing metadata (`isBetaTester`, `trialEndsAt`) is retrieved out-of-transaction via `fetchBillingInfo()` before starting the transaction.
+By utilizing atomic server-side increments (`setDoc` with `increment(1)` and merge) rather than transaction preconditions (`currentDocument.updateTime`), the usage service prevents optimistic concurrency contention and eliminates Firestore `failed-precondition` commit errors as well as local cache bloom-filter desynchronization.
 
 ---
 
@@ -496,7 +496,7 @@ support_tickets/{ticketId}        — User-submitted support tickets
 - **Smart Receipt & Notes Auto-Assignment (`ADD_TO_SHED_STOCK`):** When Smart Convert or Smart Capture processes an email, PDF invoice, till receipt, delivery note, or list of parts (e.g. from Screwfix, Travis Perkins, Toolstation), it itemises every part with quantity, category, and price into an `ADD_TO_SHED_STOCK` action.
   - **Personal Use Stock Exclusion:** All parts are assumed to be business stock to update The Shed by default. Users are provided with interactive exclusion checkboxes to untick any item purchased for personal use rather than for business/job stock. Only included items update holding quantities in The Shed; excluded personal items are omitted with an explicit confirmation toast.
 - **Stock-to-Job Assignment (`AssignStockModal.tsx`):** Tradespeople can assign holding stock from The Shed directly to an active Trade Invoice or custom direct job (quotes are excluded to prevent premature inventory decrement). Confirming the assignment decrements holding stock in The Shed, automatically appends an itemised material line item to the target Invoice with recalculated net and gross totals, flags the stock with a dedicated `[x] reserved` badge, and groups reserved materials under "Reserved & Allocated Stock by Job" at the base of The Shed.
-- **Usage Service Non-Transactional Locking:** Daily usage counters in `usageService.ts` read parent profile and settings documents non-transactionally with `getDoc` before executing a targeted transaction strictly on the daily `usage/{date}` document, completely eliminating Firestore `failed-precondition` commit errors.
+- **Usage Service Atomic Increment Operations:** Daily usage counters in `usageService.ts` read parent profile and settings documents non-transactionally with `getDoc` before executing atomic `setDoc` with `increment(1)` and merge on the daily `usage/{date}` document, completely eliminating Firestore `failed-precondition` commit errors and preventing offline cache bloom-filter desynchronization.
 
 ### 4.11 Unified Navigation & Slide-Out Drawer
 

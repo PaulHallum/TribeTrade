@@ -1,8 +1,8 @@
 import { db } from '../lib/firebase';
-import { doc, getDoc, runTransaction } from 'firebase/firestore';
+import { doc, getDoc, setDoc, increment } from 'firebase/firestore';
 
 /**
- * Helper to check active trial or premium status in transaction
+ * Helper to check active trial or premium status
  */
 function checkIsActivePremium(tier: string, isBeta: boolean, trialEndsAtRaw: any): boolean {
   if (tier === 'premium' || isBeta) return true;
@@ -17,7 +17,6 @@ function checkIsActivePremium(tier: string, isBeta: boolean, trialEndsAtRaw: any
 
 /**
  * Non-transactional helper to read private billing metadata
- * Executed outside transactions to prevent failed-precondition errors on non-existent documents.
  */
 async function fetchBillingInfo(userId: string): Promise<{ isBeta: boolean; trialEndsAtRaw: any }> {
   let isBeta = false;
@@ -38,7 +37,7 @@ async function fetchBillingInfo(userId: string): Promise<{ isBeta: boolean; tria
 
 /**
  * Increments the daily AI usage counter for the family associated with the user.
- * During 21-day Reverse Trial or Premium, limit is 100 requests/day.
+ * During 21-day Reverse Trial or Premium, limit is 50 requests/day.
  * Post-trial (Basic Mode), AI feature access is locked / limited to 0 (or basic free limit).
  */
 export async function incrementAiUsage(userId: string): Promise<void> {
@@ -46,47 +45,45 @@ export async function incrementAiUsage(userId: string): Promise<void> {
   const userRef = doc(db, 'users', userId);
   const billingInfo = await fetchBillingInfo(userId);
 
-  await runTransaction(db, async (transaction) => {
-    const userSnap = await transaction.get(userRef);
-    if (!userSnap.exists()) {
-      throw new Error('USER_NOT_FOUND');
+  const userSnap = await getDoc(userRef);
+  if (!userSnap.exists()) {
+    throw new Error('USER_NOT_FOUND');
+  }
+
+  const userData = userSnap.data();
+  const tradeUserId = userData.tradeUserId || `trade_${userId}`;
+  let tier = userData.subscriptionTier || 'free';
+  let isBeta = billingInfo.isBeta;
+  let trialEndsAtRaw: any = billingInfo.trialEndsAtRaw;
+
+  const familyRef = doc(db, 'trade_users', tradeUserId);
+  const familySnap = await getDoc(familyRef);
+
+  if (familySnap.exists()) {
+    const familyData = familySnap.data();
+    if (familyData.subscriptionTier === 'premium') {
+      tier = 'premium';
     }
-
-    const userData = userSnap.data();
-    const tradeUserId = userData.tradeUserId || `trade_${userId}`;
-    let tier = userData.subscriptionTier || 'free';
-    let isBeta = billingInfo.isBeta;
-    let trialEndsAtRaw: any = billingInfo.trialEndsAtRaw;
-
-    const familyRef = doc(db, 'trade_users', tradeUserId);
-    const familySnap = await transaction.get(familyRef);
-
-    if (familySnap.exists()) {
-      const familyData = familySnap.data();
-      if (familyData.subscriptionTier === 'premium') {
-        tier = 'premium';
-      }
-      if (familyData.isBetaTester === true) {
-        isBeta = true;
-      }
+    if (familyData.isBetaTester === true) {
+      isBeta = true;
     }
+  }
 
-    const isPremium = checkIsActivePremium(tier, isBeta, trialEndsAtRaw);
+  const isPremium = checkIsActivePremium(tier, isBeta, trialEndsAtRaw);
+  const limit = isPremium ? 50 : 0;
 
-    const usageRef = doc(db, 'trade_users', tradeUserId, 'usage', today);
-    const usageSnap = await transaction.get(usageRef);
-    const currentUses = usageSnap.exists() ? (usageSnap.data().aiUses || 0) : 0;
+  const usageRef = doc(db, 'trade_users', tradeUserId, 'usage', today);
+  const usageSnap = await getDoc(usageRef);
+  const currentUses = usageSnap.exists() ? (usageSnap.data().aiUses || 0) : 0;
 
-    const limit = isPremium ? 50 : 0;
-    if (currentUses >= limit) {
-      throw new Error('LIMIT_EXCEEDED');
-    }
+  if (currentUses >= limit) {
+    throw new Error('LIMIT_EXCEEDED');
+  }
 
-    transaction.set(usageRef, {
-      aiUses: currentUses + 1,
-      updatedAt: new Date().toISOString()
-    }, { merge: true });
-  });
+  await setDoc(usageRef, {
+    aiUses: increment(1),
+    updatedAt: new Date().toISOString()
+  }, { merge: true });
 }
 
 /**
@@ -130,19 +127,17 @@ export async function incrementNearbyUsage(userId: string, tradeUserIdHint?: str
   const limit = isPremium ? 5 : 0;
   const usageRef = doc(db, 'trade_users', tradeUserId, 'usage', today);
 
-  await runTransaction(db, async (transaction) => {
-    const usageSnap = await transaction.get(usageRef);
-    const currentRuns = usageSnap.exists() ? (usageSnap.data().nearbyRuns || 0) : 0;
+  const usageSnap = await getDoc(usageRef);
+  const currentRuns = usageSnap.exists() ? (usageSnap.data().nearbyRuns || 0) : 0;
 
-    if (currentRuns >= limit) {
-      throw new Error('LIMIT_EXCEEDED');
-    }
+  if (currentRuns >= limit) {
+    throw new Error('LIMIT_EXCEEDED');
+  }
 
-    transaction.set(usageRef, {
-      nearbyRuns: currentRuns + 1,
-      updatedAt: new Date().toISOString()
-    }, { merge: true });
-  });
+  await setDoc(usageRef, {
+    nearbyRuns: increment(1),
+    updatedAt: new Date().toISOString()
+  }, { merge: true });
 }
 
 /**
@@ -181,19 +176,17 @@ export async function incrementSmartConvertUsage(userId: string): Promise<void> 
   const limit = isPremium ? 20 : 0;
   const usageRef = doc(db, 'trade_users', tradeUserId, 'usage', today);
 
-  await runTransaction(db, async (transaction) => {
-    const usageSnap = await transaction.get(usageRef);
-    const currentRuns = usageSnap.exists() ? (usageSnap.data().smartConvertUses || 0) : 0;
+  const usageSnap = await getDoc(usageRef);
+  const currentRuns = usageSnap.exists() ? (usageSnap.data().smartConvertUses || 0) : 0;
 
-    if (currentRuns >= limit) {
-      throw new Error('LIMIT_EXCEEDED');
-    }
+  if (currentRuns >= limit) {
+    throw new Error('LIMIT_EXCEEDED');
+  }
 
-    transaction.set(usageRef, {
-      smartConvertUses: currentRuns + 1,
-      updatedAt: new Date().toISOString()
-    }, { merge: true });
-  });
+  await setDoc(usageRef, {
+    smartConvertUses: increment(1),
+    updatedAt: new Date().toISOString()
+  }, { merge: true });
 }
 
 /**
@@ -232,19 +225,17 @@ export async function incrementSmartCaptureUsage(userId: string): Promise<void> 
   const limit = isPremium ? 20 : 0;
   const usageRef = doc(db, 'trade_users', tradeUserId, 'usage', today);
 
-  await runTransaction(db, async (transaction) => {
-    const usageSnap = await transaction.get(usageRef);
-    const currentRuns = usageSnap.exists() ? (usageSnap.data().smartCaptureUses || 0) : 0;
+  const usageSnap = await getDoc(usageRef);
+  const currentRuns = usageSnap.exists() ? (usageSnap.data().smartCaptureUses || 0) : 0;
 
-    if (currentRuns >= limit) {
-      throw new Error('LIMIT_EXCEEDED');
-    }
+  if (currentRuns >= limit) {
+    throw new Error('LIMIT_EXCEEDED');
+  }
 
-    transaction.set(usageRef, {
-      smartCaptureUses: currentRuns + 1,
-      updatedAt: new Date().toISOString()
-    }, { merge: true });
-  });
+  await setDoc(usageRef, {
+    smartCaptureUses: increment(1),
+    updatedAt: new Date().toISOString()
+  }, { merge: true });
 }
 
 /**
@@ -258,17 +249,15 @@ export async function resetNearbyUsage(userId: string, tradeUserIdHint?: string)
   const today = `${year}-${month}-${day}`;
   const userRef = doc(db, 'users', userId);
 
-  await runTransaction(db, async (transaction) => {
-    const userSnap = await transaction.get(userRef);
-    if (!userSnap.exists()) return;
+  const userSnap = await getDoc(userRef);
+  if (!userSnap.exists()) return;
 
-    const userData = userSnap.data();
-    const tradeUserId = tradeUserIdHint || userData.tradeUserId || `family_${userId}`;
-    const usageRef = doc(db, 'trade_users', tradeUserId, 'usage', today);
+  const userData = userSnap.data();
+  const tradeUserId = tradeUserIdHint || userData.tradeUserId || `family_${userId}`;
+  const usageRef = doc(db, 'trade_users', tradeUserId, 'usage', today);
 
-    transaction.set(usageRef, {
-      nearbyRuns: 0,
-      updatedAt: new Date().toISOString()
-    }, { merge: true });
-  });
+  await setDoc(usageRef, {
+    nearbyRuns: 0,
+    updatedAt: new Date().toISOString()
+  }, { merge: true });
 }

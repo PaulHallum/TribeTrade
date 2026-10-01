@@ -137,7 +137,13 @@ export default function Hub({ onNavigate, onGenerateBriefing }: { onNavigate?: (
     });
 
     const unsubAccounts = onSnapshot(accountsRef, (snapshot) => {
-      setConnectedAccounts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setConnectedAccounts(prev => {
+        // If snapshot is empty and strictly from local cache, avoid prematurely wiping previously loaded accounts
+        if (snapshot.empty && snapshot.metadata.fromCache && prev.length > 0) {
+          return prev;
+        }
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      });
     }, (err) => {
       logger.warn('Hub: Failed to fetch connected accounts snapshot', err);
     });
